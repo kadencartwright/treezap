@@ -4,26 +4,18 @@ Clean up stale Git worktrees without guessing where your tools put them.
 
 Treezap is a small CLI that starts from the directory where your main checkouts live, asks Git where each repository's registered worktrees are, and removes only linked worktrees that pass conservative safety checks.
 
-![Treezap demo](assets/demo.gif)
+![Treezap demo](https://raw.githubusercontent.com/kadencartwright/treezap/master/assets/demo.gif)
 
 ## Why
 
 Agent and editor workflows create worktrees in many different places. The main checkout is usually easy to find; the worktrees are not. Treezap uses Git's own worktree registry to discover them, then applies deterministic checks before deleting anything.
 
-## Install
+## Usage
 
-This package is intended to be delivered with `npx`:
+Run it directly with `npx`:
 
 ```sh
 npx treezap candidates ~/code --min-age 30d
-```
-
-For local development from this repository:
-
-```sh
-npm install
-npm run build
-node dist/main.cjs candidates ~/code --min-age 30d
 ```
 
 ## Quick Start
@@ -31,19 +23,19 @@ node dist/main.cjs candidates ~/code --min-age 30d
 Scan the directory that contains your normal project checkouts:
 
 ```sh
-treezap scan ~/code
+npx treezap scan ~/code
 ```
 
 Preview linked worktrees eligible for deletion:
 
 ```sh
-treezap candidates ~/code --min-age 30d
+npx treezap candidates ~/code --min-age 30d
 ```
 
 Print a compact count summary:
 
 ```sh
-treezap candidates ~/code --min-age 30d --count
+npx treezap candidates ~/code --min-age 30d --count
 ```
 
 ```text
@@ -58,19 +50,19 @@ blocked_unpushed: 1
 Delete eligible linked worktrees:
 
 ```sh
-treezap rm-old ~/code --min-age 30d
+npx treezap rm-old ~/code --min-age 30d
 ```
 
 Inspect one path:
 
 ```sh
-treezap stat /path/to/worktree
+npx treezap stat /path/to/worktree
 ```
 
 Delete one eligible linked worktree:
 
 ```sh
-treezap rm /path/to/worktree --min-age 30d
+npx treezap rm /path/to/worktree --min-age 30d
 ```
 
 ## Safety Rules
