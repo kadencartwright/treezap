@@ -5,9 +5,9 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import test from "node:test"
 
-import { Effect } from "effect"
+import { Effect, Stream } from "effect"
 
-import { scanRoot } from "../src/scan"
+import { collectScanRoot, scanRoot } from "../src/scan"
 
 const git = (cwd: string, args: ReadonlyArray<string>): string =>
   execFileSync("git", args, {
@@ -43,7 +43,7 @@ test("scans repositories under a root and includes their worktrees", async (t) =
   createRepo(beta)
   git(alpha, ["worktree", "add", "--quiet", "-b", "feature/linked", alphaLinkedWorktree, "HEAD"])
 
-  const result = await Effect.runPromise(scanRoot(root))
+  const result = await Effect.runPromise(collectScanRoot(root))
 
   assert.equal(result.root, root)
   assert.deepEqual(
@@ -64,4 +64,27 @@ test("scans repositories under a root and includes their worktrees", async (t) =
   const betaResult = result.repositories.find((repository) => repository.path === beta)
   assert.ok(betaResult)
   assert.deepEqual(betaResult.worktrees.map((worktree) => worktree.path), [beta])
+})
+
+test("streams scanned repositories under a root", async (t) => {
+  const root = mkdtempSync(join(tmpdir(), "worktree-sentinel-scan-"))
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+
+  const alpha = join(root, "alpha")
+  const beta = join(root, "beta")
+
+  createRepo(alpha)
+  createRepo(beta)
+
+  const repositories = await Effect.runPromise(
+    scanRoot(root).pipe(
+      Stream.runCollect,
+      Effect.map((items) => Array.from(items))
+    )
+  )
+
+  assert.deepEqual(
+    repositories.map((repository) => repository.path),
+    [alpha, beta]
+  )
 })

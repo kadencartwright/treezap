@@ -4,7 +4,7 @@ import { Args, Command, Options } from "@effect/cli"
 import { NodeContext, NodeRuntime } from "@effect/platform-node"
 import { Console, Effect } from "effect"
 
-import { scanRoot } from "./scan"
+import { collectScanRoot } from "./scan"
 
 const agentHelp = Options.boolean("agent-help").pipe(
   Options.withDescription("Print the concise command flow intended for agent harnesses.")
@@ -28,7 +28,7 @@ const scan = Command.make(
   { root: rootArg },
   ({ root }) =>
     Effect.gen(function* () {
-      const result = yield* scanRoot(root)
+      const result = yield* collectScanRoot(root)
       yield* Console.log(JSON.stringify(result, null, 2))
     })
 ).pipe(

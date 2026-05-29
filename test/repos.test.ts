@@ -5,7 +5,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import test from "node:test"
 
-import { Effect } from "effect"
+import { Effect, Stream } from "effect"
 
 import { discoverRepos } from "../src/repos"
 
@@ -31,7 +31,12 @@ test("discovers git repositories under a root", async (t) => {
   git(beta, ["init", "--quiet", "--initial-branch", "main"])
   git(join(root, "node_modules", "ignored-repo"), ["init", "--quiet", "--initial-branch", "main"])
 
-  const repos = await Effect.runPromise(discoverRepos(root))
+  const repos = await Effect.runPromise(
+    discoverRepos(root).pipe(
+      Stream.runCollect,
+      Effect.map((paths) => Array.from(paths))
+    )
+  )
 
   assert.deepEqual(repos, [alpha, beta])
 })

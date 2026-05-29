@@ -9,15 +9,7 @@ export interface DiscoverReposError {
   readonly cause: unknown
 }
 
-export const discoverRepos = (
-  rootPath: string
-): Effect.Effect<ReadonlyArray<string>, DiscoverReposError> =>
-  discoverReposStream(rootPath).pipe(
-    Stream.runCollect,
-    Effect.map((repos) => Array.from(repos))
-  )
-
-export const discoverReposStream = (rootPath: string): Stream.Stream<string, DiscoverReposError> => {
+export const discoverRepos = (rootPath: string): Stream.Stream<string, DiscoverReposError> => {
   const visit = (directory: string): Stream.Stream<string, DiscoverReposError> =>
     readRepositoryDiscoveryTarget(rootPath, directory).pipe(
       Stream.fromEffect,

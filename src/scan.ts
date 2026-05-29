@@ -1,6 +1,6 @@
 import { Effect, Stream } from "effect"
 
-import { discoverReposStream, type DiscoverReposError } from "./repos"
+import { discoverRepos, type DiscoverReposError } from "./repos"
 import type { WorktreePorcelainEntry } from "./worktreePorcelain"
 import { listWorktrees, type WorktreeListError } from "./worktrees"
 
@@ -16,14 +16,18 @@ export interface ScanResult {
 
 export type ScanRootError = DiscoverReposError | WorktreeListError
 
-export const scanRoot = (rootPath: string): Effect.Effect<ScanResult, ScanRootError> =>
-  discoverReposStream(rootPath).pipe(
+export const scanRoot = (rootPath: string): Stream.Stream<ScannedRepository, ScanRootError> =>
+  discoverRepos(rootPath).pipe(
     Stream.mapEffect((repo) =>
       Effect.map(listWorktrees(repo), (worktrees): ScannedRepository => ({
         path: repo,
         worktrees
       }))
-    ),
+    )
+  )
+
+export const collectScanRoot = (rootPath: string): Effect.Effect<ScanResult, ScanRootError> =>
+  scanRoot(rootPath).pipe(
     Stream.runCollect,
     Effect.map((repositories) => ({
       root: rootPath,
