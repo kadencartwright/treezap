@@ -12,7 +12,7 @@
 		"url": "https://github.com/kadencartwright/treezap/issues"
 	},
 	"bin": {
-		"treezap": "./dist/main.cjs"
+		"treezap": "dist/main.cjs"
 	},
 	"scripts": {
 		"build": "node scripts/build.mjs",
