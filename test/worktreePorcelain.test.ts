@@ -43,14 +43,12 @@ test("parses real git porcelain for a repo with one linked worktree", (t) => {
   const main = byPath.get(repo)
   assert.ok(main)
   assert.match(main.head ?? "", /^[0-9a-f]{40}$/)
-  assert.equal(main.branch, "main")
-  assert.equal(main.detached, false)
+  assert.deepEqual(main.status, { kind: "branch", branch: "main" })
 
   const linked = byPath.get(linkedWorktree)
   assert.ok(linked)
   assert.match(linked.head ?? "", /^[0-9a-f]{40}$/)
-  assert.equal(linked.branch, "feature/linked")
-  assert.equal(linked.detached, false)
+  assert.deepEqual(linked.status, { kind: "branch", branch: "feature/linked" })
 })
 
 test("parses real git porcelain for a detached linked worktree", (t) => {
@@ -75,8 +73,7 @@ test("parses real git porcelain for a detached linked worktree", (t) => {
 
   assert.ok(detached)
   assert.match(detached.head ?? "", /^[0-9a-f]{40}$/)
-  assert.equal(detached.branch, undefined)
-  assert.equal(detached.detached, true)
+  assert.deepEqual(detached.status, { kind: "detached" })
 })
 
 test("parses real git porcelain for a locked linked worktree with a spaced path", (t) => {
@@ -101,8 +98,73 @@ test("parses real git porcelain for a locked linked worktree with a spaced path"
   const locked = new Map(parsed.map((entry) => [entry.path, entry])).get(lockedWorktree)
 
   assert.ok(locked)
-  assert.equal(locked.branch, "feature/locked")
-  assert.equal(locked.detached, false)
-  assert.equal(locked.locked, true)
-  assert.equal(locked.lockReason, "active agent run")
+  assert.deepEqual(locked.status, { kind: "branch", branch: "feature/locked" })
+  assert.deepEqual(locked.annotations, [{ kind: "locked", reason: "active agent run" }])
+})
+
+test("parses real git porcelain for a prunable missing linked worktree", (t) => {
+  const root = mkdtempSync(join(tmpdir(), "worktree-sentinel-porcelain-"))
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+
+  const repo = join(root, "repo")
+  const missingWorktree = join(root, "missing-worktree")
+
+  mkdirSync(repo)
+  git(repo, ["init", "--quiet", "--initial-branch", "main"])
+  git(repo, ["config", "user.email", "sentinel-test@example.test"])
+  git(repo, ["config", "user.name", "Sentinel Test"])
+
+  writeFileSync(join(repo, "README.md"), "# test repo\n")
+  git(repo, ["add", "README.md"])
+  git(repo, ["commit", "--quiet", "-m", "initial commit"])
+  git(repo, ["worktree", "add", "--quiet", "-b", "feature/missing", missingWorktree, "HEAD"])
+  rmSync(missingWorktree, { recursive: true, force: true })
+
+  const parsed = parseWorktreePorcelain(git(repo, ["worktree", "list", "--porcelain"]))
+  const missing = new Map(parsed.map((entry) => [entry.path, entry])).get(missingWorktree)
+
+  assert.ok(missing)
+  assert.deepEqual(missing.status, { kind: "branch", branch: "feature/missing" })
+  assert.deepEqual(missing.annotations, [
+    { kind: "prunable", reason: "gitdir file points to non-existent location" }
+  ])
+})
+
+test("parses real git porcelain for a bare repository", (t) => {
+  const root = mkdtempSync(join(tmpdir(), "worktree-sentinel-porcelain-"))
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+
+  const repo = join(root, "bare.git")
+
+  git(root, ["init", "--quiet", "--bare", repo])
+
+  const parsed = parseWorktreePorcelain(git(repo, ["worktree", "list", "--porcelain"]))
+
+  assert.equal(parsed.length, 1)
+  assert.equal(parsed[0]?.path, repo)
+  assert.deepEqual(parsed[0]?.status, { kind: "bare" })
+  assert.deepEqual(parsed[0]?.annotations, [])
+})
+
+test("parses real git porcelain without a trailing blank line", (t) => {
+  const root = mkdtempSync(join(tmpdir(), "worktree-sentinel-porcelain-"))
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+
+  const repo = join(root, "repo")
+
+  mkdirSync(repo)
+  git(repo, ["init", "--quiet", "--initial-branch", "main"])
+  git(repo, ["config", "user.email", "sentinel-test@example.test"])
+  git(repo, ["config", "user.name", "Sentinel Test"])
+
+  writeFileSync(join(repo, "README.md"), "# test repo\n")
+  git(repo, ["add", "README.md"])
+  git(repo, ["commit", "--quiet", "-m", "initial commit"])
+
+  const porcelain = git(repo, ["worktree", "list", "--porcelain"]).trimEnd()
+  const parsed = parseWorktreePorcelain(porcelain)
+
+  assert.equal(parsed.length, 1)
+  assert.equal(parsed[0]?.path, repo)
+  assert.deepEqual(parsed[0]?.status, { kind: "branch", branch: "main" })
 })

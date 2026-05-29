@@ -1,10 +1,25 @@
+export type WorktreePorcelainStatus =
+  | {
+      readonly kind: "branch"
+      readonly branch: string
+    }
+  | {
+      readonly kind: "detached"
+    }
+  | {
+      readonly kind: "bare"
+    }
+
+export interface WorktreePorcelainAnnotation {
+  readonly kind: "locked" | "prunable"
+  readonly reason?: string
+}
+
 export interface WorktreePorcelainEntry {
   readonly path: string
   readonly head?: string
-  readonly branch?: string
-  readonly detached: boolean
-  readonly locked: boolean
-  readonly lockReason?: string
+  readonly status: WorktreePorcelainStatus
+  readonly annotations: ReadonlyArray<WorktreePorcelainAnnotation>
 }
 
 type Mutable<T> = {
@@ -12,8 +27,8 @@ type Mutable<T> = {
 }
 
 type WorktreePorcelainEntryDraft = Partial<Mutable<WorktreePorcelainEntry>> & {
-  detached: boolean
-  locked: boolean
+  status: WorktreePorcelainStatus
+  annotations: Array<WorktreePorcelainAnnotation>
 }
 
 const branchNameFromRef = (ref: string): string =>
@@ -26,23 +41,54 @@ const applyRecordLine = (draft: WorktreePorcelainEntryDraft, line: string) => {
   }
 
   if (line.startsWith("branch ")) {
-    draft.branch = branchNameFromRef(line.slice("branch ".length))
+    draft.status = {
+      kind: "branch",
+      branch: branchNameFromRef(line.slice("branch ".length))
+    }
     return
   }
 
   if (line === "detached") {
-    draft.detached = true
+    draft.status = {
+      kind: "detached"
+    }
+    return
+  }
+
+  if (line === "bare") {
+    draft.status = {
+      kind: "bare"
+    }
     return
   }
 
   if (line === "locked") {
-    draft.locked = true
+    draft.annotations.push({
+      kind: "locked"
+    })
     return
   }
 
   if (line.startsWith("locked ")) {
-    draft.locked = true
-    draft.lockReason = line.slice("locked ".length)
+    draft.annotations.push({
+      kind: "locked",
+      reason: line.slice("locked ".length)
+    })
+    return
+  }
+
+  if (line === "prunable") {
+    draft.annotations.push({
+      kind: "prunable"
+    })
+    return
+  }
+
+  if (line.startsWith("prunable ")) {
+    draft.annotations.push({
+      kind: "prunable",
+      reason: line.slice("prunable ".length)
+    })
   }
 }
 
@@ -56,8 +102,10 @@ const parseRecord = (record: string): WorktreePorcelainEntry | undefined => {
 
   const draft: WorktreePorcelainEntryDraft = {
     path: firstLine.slice("worktree ".length),
-    detached: false,
-    locked: false
+    status: {
+      kind: "detached"
+    },
+    annotations: []
   }
 
   for (const line of remainingLines) {
@@ -71,10 +119,8 @@ const parseRecord = (record: string): WorktreePorcelainEntry | undefined => {
   return {
     path: draft.path,
     head: draft.head,
-    branch: draft.branch,
-    detached: draft.detached,
-    locked: draft.locked,
-    lockReason: draft.lockReason
+    status: draft.status,
+    annotations: draft.annotations
   }
 }
 
