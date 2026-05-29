@@ -4,11 +4,11 @@
   "description": "CLI primitives for discovering and deleting stale Git worktrees.",
   "type": "module",
   "bin": {
-    "worktree-sentinel": "./dist/main.js",
-    "sentinel": "./dist/main.js"
+    "worktree-sentinel": "./dist/main.cjs",
+    "sentinel": "./dist/main.cjs"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "node scripts/build.mjs",
     "dev": "tsx src/main.ts",
     "check": "tsc -p tsconfig.json --noEmit",
     "test": "node --import tsx --test test/**/*.test.ts",
@@ -18,8 +18,7 @@
     "prepack": "npm run build"
   },
   "files": [
-    "dist",
-    "DESIGN.md"
+    "dist"
   ],
   "dependencies": {
     "@effect/cli": "^0.75.1",
@@ -29,6 +28,7 @@
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
+    "esbuild": "^0.28.0",
     "tsx": "^4.20.0",
     "typescript": "^5.9.0"
   },

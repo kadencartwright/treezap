@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process"
 
 import { Effect } from "effect"
 
-import { parseWorktreePorcelain, type WorktreePorcelainEntry } from "./worktreePorcelain.js"
+import { parseWorktreePorcelain, type WorktreePorcelainEntry } from "./worktreePorcelain"
 
 export interface WorktreeListError {
   readonly _tag: "WorktreeListError"

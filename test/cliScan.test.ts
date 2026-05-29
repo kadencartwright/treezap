@@ -5,10 +5,6 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import test from "node:test"
 
-import { Effect } from "effect"
-
-import { listWorktrees } from "../src/worktrees"
-
 const git = (cwd: string, args: ReadonlyArray<string>): string =>
   execFileSync("git", args, {
     cwd,
@@ -20,8 +16,8 @@ const git = (cwd: string, args: ReadonlyArray<string>): string =>
     }
   })
 
-test("lists real git worktrees for one repository", async (t) => {
-  const root = mkdtempSync(join(tmpdir(), "worktree-sentinel-list-"))
+test("scan command prints JSON inventory for repositories under a root", (t) => {
+  const root = mkdtempSync(join(tmpdir(), "worktree-sentinel-cli-scan-"))
   t.after(() => rmSync(root, { recursive: true, force: true }))
 
   const repo = join(root, "repo")
@@ -37,10 +33,25 @@ test("lists real git worktrees for one repository", async (t) => {
   git(repo, ["commit", "--quiet", "-m", "initial commit"])
   git(repo, ["worktree", "add", "--quiet", "-b", "feature/linked", linkedWorktree, "HEAD"])
 
-  const worktrees = await Effect.runPromise(listWorktrees(repo))
-  const byPath = new Map(worktrees.map((entry) => [entry.path, entry]))
+  const output = execFileSync(process.execPath, ["--import", "tsx", "src/main.ts", "scan", root], {
+    cwd: process.cwd(),
+    encoding: "utf8"
+  })
+  const parsed = JSON.parse(output)
 
-  assert.equal(worktrees.length, 2)
-  assert.deepEqual(byPath.get(repo)?.status, { kind: "branch", branch: "main" })
-  assert.deepEqual(byPath.get(linkedWorktree)?.status, { kind: "branch", branch: "feature/linked" })
+  assert.equal(parsed.root, root)
+  assert.deepEqual(
+    parsed.repositories.map((repository: { path: string }) => repository.path),
+    [repo]
+  )
+  assert.deepEqual(
+    parsed.repositories[0].worktrees.map((worktree: { path: string; status: unknown }) => [
+      worktree.path,
+      worktree.status
+    ]),
+    [
+      [repo, { kind: "branch", branch: "main" }],
+      [linkedWorktree, { kind: "branch", branch: "feature/linked" }]
+    ]
+  )
 })

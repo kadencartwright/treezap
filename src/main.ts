@@ -4,6 +4,8 @@ import { Args, Command, Options } from "@effect/cli"
 import { NodeContext, NodeRuntime } from "@effect/platform-node"
 import { Console, Effect } from "effect"
 
+import { scanRoot } from "./scan"
+
 const agentHelp = Options.boolean("agent-help").pipe(
   Options.withDescription("Print the concise command flow intended for agent harnesses.")
 )
@@ -25,17 +27,10 @@ const scan = Command.make(
   "scan",
   { root: rootArg },
   ({ root }) =>
-    Console.log(
-      JSON.stringify(
-        {
-          command: "scan",
-          root,
-          status: "not_implemented"
-        },
-        null,
-        2
-      )
-    )
+    Effect.gen(function* () {
+      const result = yield* scanRoot(root)
+      yield* Console.log(JSON.stringify(result, null, 2))
+    })
 ).pipe(
   Command.withDescription("Discover Git repositories under a root and list their worktrees.")
 )
