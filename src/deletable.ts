@@ -61,7 +61,7 @@ export const selectDeletionCandidates = (
 
   for (const status of statuses) {
     const decision = evaluateDeletion(status)
-    const ageDays = getAgeDays(status.lastCommitAt, now)
+    const ageDays = calculateAgeDays(status.lastCommitAt, now)
 
     if (decision.deletable && ageDays > minimumAgeDays) {
       candidates.push({
@@ -76,5 +76,5 @@ export const selectDeletionCandidates = (
   return candidates
 }
 
-const getAgeDays = (date: string, now: Date): number =>
+export const calculateAgeDays = (date: string, now: Date): number =>
   Math.floor((now.getTime() - new Date(date).getTime()) / millisecondsPerDay)

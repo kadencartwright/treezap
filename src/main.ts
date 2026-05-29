@@ -6,7 +6,12 @@ import { Console, Effect } from "effect"
 
 import { collectCandidates } from "./candidates"
 import { evaluateDeletion } from "./deletable"
-import { isDurationParseError, parseMinAgeDays } from "./duration"
+import {
+  isDurationParseError,
+  parseMinAgeDays,
+  type DurationParseError
+} from "./duration"
+import { evaluateRemove } from "./remove"
 import { collectScanRoot } from "./scan"
 import { inspectPath } from "./status"
 
@@ -26,6 +31,16 @@ const rootArg = Args.text({ name: "root" }).pipe(
 const pathArg = Args.text({ name: "path" }).pipe(
   Args.withDescription("Repository or worktree path.")
 )
+
+const parseMinimumAgeDays = (input: string): Effect.Effect<number, DurationParseError> => {
+  const minimumAgeDays = parseMinAgeDays(input)
+
+  if (isDurationParseError(minimumAgeDays)) {
+    return Effect.fail(minimumAgeDays)
+  }
+
+  return Effect.succeed(minimumAgeDays)
+}
 
 const scan = Command.make(
   "scan",
@@ -60,12 +75,7 @@ const candidates = Command.make(
   },
   ({ minAge, root }) =>
     Effect.gen(function* () {
-      const minimumAgeDays = parseMinAgeDays(minAge)
-
-      if (isDurationParseError(minimumAgeDays)) {
-        return yield* Effect.fail(minimumAgeDays)
-      }
-
+      const minimumAgeDays = yield* parseMinimumAgeDays(minAge)
       const result = yield* collectCandidates(root, { minimumAgeDays })
       yield* Console.log(JSON.stringify(result, null, 2))
     })
@@ -80,18 +90,11 @@ const rm = Command.make(
     minAge
   },
   ({ minAge, path }) =>
-    Console.log(
-      JSON.stringify(
-        {
-          command: "rm",
-          path,
-          minAge,
-          status: "not_implemented"
-        },
-        null,
-        2
-      )
-    )
+    Effect.gen(function* () {
+      const minimumAgeDays = yield* parseMinimumAgeDays(minAge)
+      const result = yield* evaluateRemove(path, { minimumAgeDays })
+      yield* Console.log(JSON.stringify(result, null, 2))
+    })
 ).pipe(
   Command.withDescription("Delete one stale repository or worktree after safety checks.")
 )
