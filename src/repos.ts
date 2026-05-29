@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, statSync } from "node:fs"
 import { join } from "node:path"
 
-import { Effect } from "effect"
+import { Chunk, Effect, Stream } from "effect"
 
 export interface DiscoverReposError {
   readonly _tag: "DiscoverReposError"
@@ -12,27 +12,54 @@ export interface DiscoverReposError {
 export const discoverRepos = (
   rootPath: string
 ): Effect.Effect<ReadonlyArray<string>, DiscoverReposError> =>
-  Effect.try({
-    try: () => {
-      const repos: Array<string> = []
+  discoverReposStream(rootPath).pipe(
+    Stream.runCollect,
+    Effect.map((repos) => Array.from(repos))
+  )
 
-      const visit = (directory: string) => {
-        if (hasGitDirectory(directory)) {
-          repos.push(directory)
-          return
+export const discoverReposStream = (rootPath: string): Stream.Stream<string, DiscoverReposError> => {
+  const visit = (directory: string): Stream.Stream<string, DiscoverReposError> =>
+    readRepositoryDiscoveryTarget(rootPath, directory).pipe(
+      Stream.fromEffect,
+      Stream.flatMap((target) => {
+        if (target.kind === "repo") {
+          return Stream.succeed(target.path)
         }
 
-        const entries = readdirSync(directory, { withFileTypes: true })
-          .filter((entry) => entry.isDirectory() && !ignoredDirectories.has(entry.name))
-          .sort((left, right) => left.name.localeCompare(right.name))
+        return Stream.fromIterable(target.children).pipe(Stream.flatMap(visit))
+      })
+    )
 
-        for (const entry of entries) {
-          visit(join(directory, entry.name))
+  return visit(rootPath)
+}
+
+type RepositoryDiscoveryTarget =
+  | {
+      readonly kind: "repo"
+      readonly path: string
+    }
+  | {
+      readonly kind: "children"
+      readonly children: Chunk.Chunk<string>
+    }
+
+const readRepositoryDiscoveryTarget = (
+  rootPath: string,
+  directory: string
+): Effect.Effect<RepositoryDiscoveryTarget, DiscoverReposError> =>
+  Effect.try({
+    try: () => {
+      if (hasGitDirectory(directory)) {
+        return {
+          kind: "repo",
+          path: directory
         }
       }
 
-      visit(rootPath)
-      return repos
+      return {
+        kind: "children",
+        children: Chunk.fromIterable(readDiscoverableChildren(directory))
+      }
     },
     catch: (cause): DiscoverReposError => ({
       _tag: "DiscoverReposError",
@@ -53,3 +80,9 @@ const hasGitDirectory = (directory: string): boolean => {
   const gitPath = join(directory, ".git")
   return existsSync(gitPath) && statSync(gitPath).isDirectory()
 }
+
+const readDiscoverableChildren = (directory: string): ReadonlyArray<string> =>
+  readdirSync(directory, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && !ignoredDirectories.has(entry.name))
+    .sort((left, right) => left.name.localeCompare(right.name))
+    .map((entry) => join(directory, entry.name))
