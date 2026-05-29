@@ -1,0 +1,23 @@
+FROM node:22-bookworm
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends git ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY package.json package-lock.json tsconfig.json ./
+COPY src ./src
+
+RUN npm ci && npm run build && npm link
+
+COPY fixtures/seed-git-worktrees.sh /usr/local/bin/seed-git-worktrees
+COPY fixtures/check-git-worktree-fixture.sh /usr/local/bin/check-git-worktree-fixture
+COPY fixtures/entrypoint.sh /usr/local/bin/worktree-sentinel-fixture
+
+RUN chmod +x /usr/local/bin/seed-git-worktrees /usr/local/bin/check-git-worktree-fixture /usr/local/bin/worktree-sentinel-fixture
+
+WORKDIR /workspace
+
+ENTRYPOINT ["worktree-sentinel-fixture"]
+CMD ["bash"]
