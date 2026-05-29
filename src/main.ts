@@ -4,6 +4,7 @@ import { Args, Command, Options } from "@effect/cli"
 import { NodeContext, NodeRuntime } from "@effect/platform-node"
 import { Console, Effect } from "effect"
 
+import { removeOldWorktrees } from "./bulkRemove"
 import { collectCandidates } from "./candidates"
 import { evaluateDeletion } from "./deletable"
 import {
@@ -106,18 +107,11 @@ const rmOld = Command.make(
     minAge
   },
   ({ minAge, root }) =>
-    Console.log(
-      JSON.stringify(
-        {
-          command: "rm-old",
-          root,
-          minAge,
-          status: "not_implemented"
-        },
-        null,
-        2
-      )
-    )
+    Effect.gen(function* () {
+      const minimumAgeDays = yield* parseMinimumAgeDays(minAge)
+      const result = yield* removeOldWorktrees(root, { minimumAgeDays })
+      yield* Console.log(JSON.stringify(result, null, 2))
+    })
 ).pipe(
   Command.withDescription("Bulk delete stale repositories or worktrees discovered under a root.")
 )
