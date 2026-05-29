@@ -5,6 +5,7 @@ import {
   evaluateDeletion,
   type DeletionDecision
 } from "./deletable"
+import { runGit } from "./git"
 import { inspectPath, type StatusError, type WorktreeStatus } from "./status"
 
 export interface RemoveEvaluationOptions {
@@ -15,7 +16,7 @@ export interface RemoveEvaluationOptions {
 export interface RemoveEvaluationResult {
   readonly path: string
   readonly minimumAgeDays: number
-  readonly deleted: false
+  readonly deleted: boolean
   readonly eligible: boolean
   readonly ageDays: number
   readonly status: WorktreeStatus
@@ -31,20 +32,45 @@ export const evaluateRemove = (
   const now = options.now ?? new Date()
   const minimumAgeDays = options.minimumAgeDays ?? defaultMinimumAgeDays
 
-  return inspectPath(path).pipe(
-    Effect.map((status) => {
-      const decision = evaluateDeletion(status)
-      const ageDays = calculateAgeDays(status.lastCommitAt, now)
+  return Effect.gen(function* () {
+    const initial = yield* inspectPath(path)
+    const initialEvaluation = evaluateStatus(initial, now, minimumAgeDays)
 
-      return {
-        path,
-        minimumAgeDays,
-        deleted: false as const,
-        eligible: decision.deletable && ageDays > minimumAgeDays,
-        ageDays,
-        status,
-        decision
-      }
-    })
-  )
+    if (!initialEvaluation.eligible) {
+      return initialEvaluation
+    }
+
+    const revalidated = yield* inspectPath(path)
+    const revalidatedEvaluation = evaluateStatus(revalidated, now, minimumAgeDays)
+
+    if (!revalidatedEvaluation.eligible) {
+      return revalidatedEvaluation
+    }
+
+    yield* runGit(path, ["worktree", "remove", path])
+
+    return {
+      ...revalidatedEvaluation,
+      deleted: true
+    }
+  })
+}
+
+const evaluateStatus = (
+  status: WorktreeStatus,
+  now: Date,
+  minimumAgeDays: number
+): RemoveEvaluationResult => {
+  const decision = evaluateDeletion(status)
+  const ageDays = calculateAgeDays(status.lastCommitAt, now)
+
+  return {
+    path: status.path,
+    minimumAgeDays,
+    deleted: false,
+    eligible: decision.deletable && ageDays > minimumAgeDays,
+    ageDays,
+    status,
+    decision
+  }
 }
