@@ -52,7 +52,7 @@ assert_contains "$dirty_status" " M fixtures/old-dirty.txt"
 assert_contains "$untracked_status" "?? untracked.txt"
 assert_no_upstream /workspace/worktrees/alpha-old-unpushed
 
-sentinel --help >/dev/null
+treezap --help >/dev/null
 
 cat <<'EOF'
 Fixture check passed.

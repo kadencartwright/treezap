@@ -19,7 +19,7 @@ const git = (cwd: string, args: ReadonlyArray<string>): string =>
   })
 
 test("parses real git porcelain for a repo with one linked worktree", (t) => {
-  const root = mkdtempSync(join(tmpdir(), "worktree-sentinel-porcelain-"))
+  const root = mkdtempSync(join(tmpdir(), "treezap-porcelain-"))
   t.after(() => rmSync(root, { recursive: true, force: true }))
 
   const repo = join(root, "repo")
@@ -27,7 +27,7 @@ test("parses real git porcelain for a repo with one linked worktree", (t) => {
 
   mkdirSync(repo)
   git(repo, ["init", "--quiet", "--initial-branch", "main"])
-  git(repo, ["config", "user.email", "sentinel-test@example.test"])
+  git(repo, ["config", "user.email", "treezap-test@example.test"])
   git(repo, ["config", "user.name", "Sentinel Test"])
 
   writeFileSync(join(repo, "README.md"), "# test repo\n")
@@ -52,7 +52,7 @@ test("parses real git porcelain for a repo with one linked worktree", (t) => {
 })
 
 test("parses real git porcelain for a detached linked worktree", (t) => {
-  const root = mkdtempSync(join(tmpdir(), "worktree-sentinel-porcelain-"))
+  const root = mkdtempSync(join(tmpdir(), "treezap-porcelain-"))
   t.after(() => rmSync(root, { recursive: true, force: true }))
 
   const repo = join(root, "repo")
@@ -60,7 +60,7 @@ test("parses real git porcelain for a detached linked worktree", (t) => {
 
   mkdirSync(repo)
   git(repo, ["init", "--quiet", "--initial-branch", "main"])
-  git(repo, ["config", "user.email", "sentinel-test@example.test"])
+  git(repo, ["config", "user.email", "treezap-test@example.test"])
   git(repo, ["config", "user.name", "Sentinel Test"])
 
   writeFileSync(join(repo, "README.md"), "# test repo\n")
@@ -77,7 +77,7 @@ test("parses real git porcelain for a detached linked worktree", (t) => {
 })
 
 test("parses real git porcelain for a locked linked worktree with a spaced path", (t) => {
-  const root = mkdtempSync(join(tmpdir(), "worktree-sentinel-porcelain-"))
+  const root = mkdtempSync(join(tmpdir(), "treezap-porcelain-"))
   t.after(() => rmSync(root, { recursive: true, force: true }))
 
   const repo = join(root, "repo")
@@ -85,7 +85,7 @@ test("parses real git porcelain for a locked linked worktree with a spaced path"
 
   mkdirSync(repo)
   git(repo, ["init", "--quiet", "--initial-branch", "main"])
-  git(repo, ["config", "user.email", "sentinel-test@example.test"])
+  git(repo, ["config", "user.email", "treezap-test@example.test"])
   git(repo, ["config", "user.name", "Sentinel Test"])
 
   writeFileSync(join(repo, "README.md"), "# test repo\n")
@@ -103,7 +103,7 @@ test("parses real git porcelain for a locked linked worktree with a spaced path"
 })
 
 test("parses real git porcelain for a prunable missing linked worktree", (t) => {
-  const root = mkdtempSync(join(tmpdir(), "worktree-sentinel-porcelain-"))
+  const root = mkdtempSync(join(tmpdir(), "treezap-porcelain-"))
   t.after(() => rmSync(root, { recursive: true, force: true }))
 
   const repo = join(root, "repo")
@@ -111,7 +111,7 @@ test("parses real git porcelain for a prunable missing linked worktree", (t) => 
 
   mkdirSync(repo)
   git(repo, ["init", "--quiet", "--initial-branch", "main"])
-  git(repo, ["config", "user.email", "sentinel-test@example.test"])
+  git(repo, ["config", "user.email", "treezap-test@example.test"])
   git(repo, ["config", "user.name", "Sentinel Test"])
 
   writeFileSync(join(repo, "README.md"), "# test repo\n")
@@ -131,7 +131,7 @@ test("parses real git porcelain for a prunable missing linked worktree", (t) => 
 })
 
 test("parses real git porcelain for a bare repository", (t) => {
-  const root = mkdtempSync(join(tmpdir(), "worktree-sentinel-porcelain-"))
+  const root = mkdtempSync(join(tmpdir(), "treezap-porcelain-"))
   t.after(() => rmSync(root, { recursive: true, force: true }))
 
   const repo = join(root, "bare.git")
@@ -147,14 +147,14 @@ test("parses real git porcelain for a bare repository", (t) => {
 })
 
 test("parses real git porcelain without a trailing blank line", (t) => {
-  const root = mkdtempSync(join(tmpdir(), "worktree-sentinel-porcelain-"))
+  const root = mkdtempSync(join(tmpdir(), "treezap-porcelain-"))
   t.after(() => rmSync(root, { recursive: true, force: true }))
 
   const repo = join(root, "repo")
 
   mkdirSync(repo)
   git(repo, ["init", "--quiet", "--initial-branch", "main"])
-  git(repo, ["config", "user.email", "sentinel-test@example.test"])
+  git(repo, ["config", "user.email", "treezap-test@example.test"])
   git(repo, ["config", "user.name", "Sentinel Test"])
 
   writeFileSync(join(repo, "README.md"), "# test repo\n")

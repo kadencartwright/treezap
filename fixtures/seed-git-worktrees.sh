@@ -11,7 +11,7 @@ OTHER_WORKTREES="$ROOT/other-tool/worktrees"
 rm -rf "$PROJECTS" "$REMOTE_ROOT" "$WORKTREES" "$TOOL_WORKTREES" "$OTHER_WORKTREES" "$ROOT/.seeded" "$ROOT/FIXTURE.md"
 mkdir -p "$PROJECTS" "$REMOTE_ROOT" "$WORKTREES" "$TOOL_WORKTREES" "$OTHER_WORKTREES"
 
-git config --global user.email "sentinel-fixture@example.test"
+git config --global user.email "treezap-fixture@example.test"
 git config --global user.name "Sentinel Fixture"
 git config --global init.defaultBranch main
 
@@ -84,7 +84,7 @@ create_worktree "$PROJECTS/beta" stale-clean "$TOOL_WORKTREES/beta-stale-clean" 
 create_worktree "$PROJECTS/beta" threshold-edge "$WORKTREES/beta-threshold-edge" 30 yes
 
 cat > "$ROOT/FIXTURE.md" <<EOF
-# Worktree Sentinel Fixture
+# Treezap Fixture
 
 Main checkout root:
 
@@ -108,12 +108,12 @@ Seeded cases:
 
 Useful commands:
 
-  sentinel scan $PROJECTS
-  sentinel stat $WORKTREES/alpha-old-clean
-  sentinel rm-old $PROJECTS --min-age 30d
+  treezap scan $PROJECTS
+  treezap stat $WORKTREES/alpha-old-clean
+  treezap rm-old $PROJECTS --min-age 30d
 EOF
 
 touch "$ROOT/.seeded"
 
-echo "Seeded Worktree Sentinel fixture in $ROOT"
+echo "Seeded Treezap fixture in $ROOT"
 echo "Read $ROOT/FIXTURE.md for cases."

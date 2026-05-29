@@ -17,7 +17,7 @@ const git = (cwd: string, args: ReadonlyArray<string>): string =>
   })
 
 test("scan command prints JSON inventory for repositories under a root", (t) => {
-  const root = mkdtempSync(join(tmpdir(), "worktree-sentinel-cli-scan-"))
+  const root = mkdtempSync(join(tmpdir(), "treezap-cli-scan-"))
   t.after(() => rmSync(root, { recursive: true, force: true }))
 
   const repo = join(root, "repo")
@@ -25,7 +25,7 @@ test("scan command prints JSON inventory for repositories under a root", (t) => 
 
   mkdirSync(repo)
   git(repo, ["init", "--quiet", "--initial-branch", "main"])
-  git(repo, ["config", "user.email", "sentinel-test@example.test"])
+  git(repo, ["config", "user.email", "treezap-test@example.test"])
   git(repo, ["config", "user.name", "Sentinel Test"])
 
   writeFileSync(join(repo, "README.md"), "# test repo\n")

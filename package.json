@@ -1,38 +1,37 @@
 {
-  "name": "worktree-sentinel",
-  "version": "0.1.0",
-  "description": "CLI primitives for discovering and deleting stale Git worktrees.",
-  "type": "module",
-  "bin": {
-    "worktree-sentinel": "./dist/main.cjs",
-    "sentinel": "./dist/main.cjs"
-  },
-  "scripts": {
-    "build": "node scripts/build.mjs",
-    "dev": "tsx src/main.ts",
-    "check": "tsc -p tsconfig.json --noEmit",
-    "test": "node --import tsx --test test/**/*.test.ts",
-    "fixture:build": "docker build -f Dockerfile.fixture -t worktree-sentinel-fixture .",
-    "fixture:check": "docker run --rm worktree-sentinel-fixture check-git-worktree-fixture",
-    "fixture:shell": "docker run --rm -it worktree-sentinel-fixture",
-    "prepack": "npm run build"
-  },
-  "files": [
-    "dist"
-  ],
-  "dependencies": {
-    "@effect/cli": "^0.75.1",
-    "@effect/platform": "^0.96.1",
-    "@effect/platform-node": "^0.106.0",
-    "effect": "^3.21.2"
-  },
-  "devDependencies": {
-    "@types/node": "^24.0.0",
-    "esbuild": "^0.28.0",
-    "tsx": "^4.20.0",
-    "typescript": "^5.9.0"
-  },
-  "engines": {
-    "node": ">=22"
-  }
+	"name": "treezap",
+	"version": "0.1.0",
+	"description": "CLI primitives for discovering and deleting stale Git worktrees.",
+	"type": "module",
+	"bin": {
+		"treezap": "./dist/main.cjs"
+	},
+	"scripts": {
+		"build": "node scripts/build.mjs",
+		"dev": "tsx src/main.ts",
+		"check": "tsc -p tsconfig.json --noEmit",
+		"test": "node --import tsx --test test/**/*.test.ts",
+		"fixture:build": "docker build -f Dockerfile.fixture -t treezap-fixture .",
+		"fixture:check": "docker run --rm treezap-fixture check-git-worktree-fixture",
+		"fixture:shell": "docker run --rm -it treezap-fixture",
+		"prepack": "npm run build"
+	},
+	"files": [
+		"dist"
+	],
+	"dependencies": {
+		"@effect/cli": "^0.75.1",
+		"@effect/platform": "^0.96.1",
+		"@effect/platform-node": "^0.106.0",
+		"effect": "^3.21.2"
+	},
+	"devDependencies": {
+		"@types/node": "^24.0.0",
+		"esbuild": "^0.28.0",
+		"tsx": "^4.20.0",
+		"typescript": "^5.9.0"
+	},
+	"engines": {
+		"node": ">=22"
+	}
 }

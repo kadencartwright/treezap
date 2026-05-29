@@ -21,7 +21,7 @@ const git = (
   })
 
 test("rm command deletes an eligible linked worktree", (t) => {
-  const root = mkdtempSync(join(tmpdir(), "worktree-sentinel-cli-rm-"))
+  const root = mkdtempSync(join(tmpdir(), "treezap-cli-rm-"))
   t.after(() => rmSync(root, { recursive: true, force: true }))
 
   const oldDate = new Date(Date.now() - 45 * 24 * 60 * 60 * 1000)
@@ -32,7 +32,7 @@ test("rm command deletes an eligible linked worktree", (t) => {
   git(root, ["init", "--quiet", "--bare", remote])
   git(root, ["clone", "--quiet", remote, repo])
   git(repo, ["switch", "--quiet", "-c", "main"])
-  git(repo, ["config", "user.email", "sentinel-test@example.test"])
+  git(repo, ["config", "user.email", "treezap-test@example.test"])
   git(repo, ["config", "user.name", "Sentinel Test"])
 
   writeFileSync(join(repo, "README.md"), "# test repo\n")
@@ -68,7 +68,7 @@ test("rm command deletes an eligible linked worktree", (t) => {
 })
 
 test("rm command does not delete an unsafe linked worktree", (t) => {
-  const root = mkdtempSync(join(tmpdir(), "worktree-sentinel-cli-rm-"))
+  const root = mkdtempSync(join(tmpdir(), "treezap-cli-rm-"))
   t.after(() => rmSync(root, { recursive: true, force: true }))
 
   const oldDate = new Date(Date.now() - 45 * 24 * 60 * 60 * 1000)
@@ -79,7 +79,7 @@ test("rm command does not delete an unsafe linked worktree", (t) => {
   git(root, ["init", "--quiet", "--bare", remote])
   git(root, ["clone", "--quiet", remote, repo])
   git(repo, ["switch", "--quiet", "-c", "main"])
-  git(repo, ["config", "user.email", "sentinel-test@example.test"])
+  git(repo, ["config", "user.email", "treezap-test@example.test"])
   git(repo, ["config", "user.name", "Sentinel Test"])
 
   writeFileSync(join(repo, "README.md"), "# test repo\n")

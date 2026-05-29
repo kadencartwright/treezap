@@ -113,13 +113,13 @@ const rmOld = Command.make(
   Command.withDescription("Delete eligible linked worktrees.")
 )
 
-const command = Command.make("sentinel", {}, () => Console.log("Run `sentinel --help`.")).pipe(
+const command = Command.make("treezap", {}, () => Console.log("Run `treezap --help`.")).pipe(
   Command.withDescription("Git worktree cleanup primitives."),
   Command.withSubcommands([scan, stat, candidates, rm, rmOld])
 )
 
 const cli = Command.run(command, {
-  name: "worktree-sentinel",
+  name: "treezap",
   version: "0.1.0"
 })
 

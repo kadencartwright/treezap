@@ -14,11 +14,11 @@ RUN npm ci && npm run build && npm link
 
 COPY fixtures/seed-git-worktrees.sh /usr/local/bin/seed-git-worktrees
 COPY fixtures/check-git-worktree-fixture.sh /usr/local/bin/check-git-worktree-fixture
-COPY fixtures/entrypoint.sh /usr/local/bin/worktree-sentinel-fixture
+COPY fixtures/entrypoint.sh /usr/local/bin/treezap-fixture
 
-RUN chmod +x /usr/local/bin/seed-git-worktrees /usr/local/bin/check-git-worktree-fixture /usr/local/bin/worktree-sentinel-fixture
+RUN chmod +x /usr/local/bin/seed-git-worktrees /usr/local/bin/check-git-worktree-fixture /usr/local/bin/treezap-fixture
 
 WORKDIR /workspace
 
-ENTRYPOINT ["worktree-sentinel-fixture"]
+ENTRYPOINT ["treezap-fixture"]
 CMD ["bash"]

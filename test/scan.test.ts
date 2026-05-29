@@ -23,7 +23,7 @@ const git = (cwd: string, args: ReadonlyArray<string>): string =>
 const createRepo = (path: string) => {
   mkdirSync(path, { recursive: true })
   git(path, ["init", "--quiet", "--initial-branch", "main"])
-  git(path, ["config", "user.email", "sentinel-test@example.test"])
+  git(path, ["config", "user.email", "treezap-test@example.test"])
   git(path, ["config", "user.name", "Sentinel Test"])
 
   writeFileSync(join(path, "README.md"), "# test repo\n")
@@ -32,7 +32,7 @@ const createRepo = (path: string) => {
 }
 
 test("scans repositories under a root and includes their worktrees", async (t) => {
-  const root = mkdtempSync(join(tmpdir(), "worktree-sentinel-scan-"))
+  const root = mkdtempSync(join(tmpdir(), "treezap-scan-"))
   t.after(() => rmSync(root, { recursive: true, force: true }))
 
   const alpha = join(root, "alpha")
@@ -67,7 +67,7 @@ test("scans repositories under a root and includes their worktrees", async (t) =
 })
 
 test("streams scanned repositories under a root", async (t) => {
-  const root = mkdtempSync(join(tmpdir(), "worktree-sentinel-scan-"))
+  const root = mkdtempSync(join(tmpdir(), "treezap-scan-"))
   t.after(() => rmSync(root, { recursive: true, force: true }))
 
   const alpha = join(root, "alpha")

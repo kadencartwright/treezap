@@ -21,7 +21,7 @@ const git = (
   })
 
 test("rm-old deletes eligible linked worktrees and skips unsafe linked worktrees", (t) => {
-  const root = mkdtempSync(join(tmpdir(), "worktree-sentinel-cli-rm-old-"))
+  const root = mkdtempSync(join(tmpdir(), "treezap-cli-rm-old-"))
   t.after(() => rmSync(root, { recursive: true, force: true }))
 
   const oldDate = new Date(Date.now() - 45 * 24 * 60 * 60 * 1000)
@@ -33,7 +33,7 @@ test("rm-old deletes eligible linked worktrees and skips unsafe linked worktrees
   git(root, ["init", "--quiet", "--bare", remote])
   git(root, ["clone", "--quiet", remote, repo])
   git(repo, ["switch", "--quiet", "-c", "main"])
-  git(repo, ["config", "user.email", "sentinel-test@example.test"])
+  git(repo, ["config", "user.email", "treezap-test@example.test"])
   git(repo, ["config", "user.name", "Sentinel Test"])
 
   writeFileSync(join(repo, "README.md"), "# test repo\n")

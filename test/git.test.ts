@@ -9,7 +9,7 @@ import { Effect } from "effect"
 import { runGit } from "../src/git"
 
 test("runGit returns stdout and command metadata for successful git commands", async (t) => {
-  const cwd = mkdtempSync(join(tmpdir(), "worktree-sentinel-git-"))
+  const cwd = mkdtempSync(join(tmpdir(), "treezap-git-"))
   t.after(() => rmSync(cwd, { recursive: true, force: true }))
 
   const result = await Effect.runPromise(runGit(cwd, ["--version"]))
@@ -22,7 +22,7 @@ test("runGit returns stdout and command metadata for successful git commands", a
 })
 
 test("runGit returns typed command errors with stderr and exit code", async (t) => {
-  const cwd = mkdtempSync(join(tmpdir(), "worktree-sentinel-git-"))
+  const cwd = mkdtempSync(join(tmpdir(), "treezap-git-"))
   t.after(() => rmSync(cwd, { recursive: true, force: true }))
 
   const error = await Effect.runPromise(

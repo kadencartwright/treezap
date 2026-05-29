@@ -16,7 +16,7 @@ const git = (cwd: string, args: ReadonlyArray<string>): string =>
   })
 
 test("discovers git repositories under a root", async (t) => {
-  const root = mkdtempSync(join(tmpdir(), "worktree-sentinel-repos-"))
+  const root = mkdtempSync(join(tmpdir(), "treezap-repos-"))
   t.after(() => rmSync(root, { recursive: true, force: true }))
 
   const alpha = join(root, "alpha")
