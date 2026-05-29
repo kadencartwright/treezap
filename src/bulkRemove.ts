@@ -1,6 +1,6 @@
 import { Effect, Either } from "effect"
 
-import { evaluateRemove, type RemoveEvaluationResult } from "./remove"
+import { removePath, type RemoveEvaluationResult } from "./remove"
 import { collectScanRoot, type ScanRootError } from "./scan"
 
 export interface BulkRemoveOptions {
@@ -38,24 +38,27 @@ export const removeOldWorktrees = (
     const deleted: Array<RemoveEvaluationResult> = []
     const skipped: Array<RemoveEvaluationResult> = []
     const failed: Array<BulkRemoveFailure> = []
+    const linkedWorktrees = scan.repositories.flatMap((repository) =>
+      repository.worktrees
+        .filter((worktree) => worktree.path !== repository.path)
+        .map((worktree) => worktree.path)
+    )
 
-    for (const repository of scan.repositories) {
-      for (const worktree of repository.worktrees) {
-        if (worktree.path === repository.path) {
-          continue
-        }
-
-        const result = yield* evaluateRemove(worktree.path, { minimumAgeDays }).pipe(
-          Effect.either
-        )
-
-        recordRemoveResult(worktree.path, result, {
-          deleted,
-          skipped,
-          failed
-        })
-      }
-    }
+    yield* Effect.forEach(
+      linkedWorktrees,
+      (path) =>
+        removePath(path, { minimumAgeDays }).pipe(
+          Effect.either,
+          Effect.map((result) =>
+            recordRemoveResult(path, result, {
+              deleted,
+              skipped,
+              failed
+            })
+          )
+        ),
+      { discard: true }
+    )
 
     return {
       root,

@@ -1,13 +1,12 @@
 import { existsSync, readdirSync, statSync } from "node:fs"
 import { join } from "node:path"
 
-import { Chunk, Effect, Stream } from "effect"
+import { Chunk, Data, Effect, Stream } from "effect"
 
-export interface DiscoverReposError {
-  readonly _tag: "DiscoverReposError"
+export class DiscoverReposError extends Data.TaggedError("DiscoverReposError")<{
   readonly rootPath: string
   readonly cause: unknown
-}
+}> {}
 
 export const discoverRepos = (rootPath: string): Stream.Stream<string, DiscoverReposError> => {
   const visit = (directory: string): Stream.Stream<string, DiscoverReposError> =>
@@ -53,8 +52,7 @@ const readRepositoryDiscoveryTarget = (
         children: Chunk.fromIterable(readDiscoverableChildren(directory))
       }
     },
-    catch: (cause): DiscoverReposError => ({
-      _tag: "DiscoverReposError",
+    catch: (cause): DiscoverReposError => new DiscoverReposError({
       rootPath,
       cause
     })

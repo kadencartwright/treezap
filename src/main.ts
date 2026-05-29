@@ -12,7 +12,7 @@ import {
   parseMinAgeDays,
   type DurationParseError
 } from "./duration"
-import { evaluateRemove } from "./remove"
+import { removePath } from "./remove"
 import { collectScanRoot } from "./scan"
 import { inspectPath } from "./status"
 
@@ -90,7 +90,7 @@ const rm = Command.make(
   ({ minAge, path }) =>
     Effect.gen(function* () {
       const minimumAgeDays = yield* parseMinimumAgeDays(minAge)
-      const result = yield* evaluateRemove(path, { minimumAgeDays })
+      const result = yield* removePath(path, { minimumAgeDays })
       yield* Console.log(JSON.stringify(result, null, 2))
     })
 ).pipe(

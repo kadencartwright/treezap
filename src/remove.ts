@@ -25,7 +25,7 @@ export interface RemoveEvaluationResult {
 
 const defaultMinimumAgeDays = 30
 
-export const evaluateRemove = (
+export const removePath = (
   path: string,
   options: RemoveEvaluationOptions = {}
 ): Effect.Effect<RemoveEvaluationResult, StatusError> => {
