@@ -2,9 +2,9 @@ import type { WorktreeStatus } from "./status"
 
 export type DeletionReason =
   | "dirty"
-  | "missing_upstream"
+  | "missing_default_branch"
   | "untracked"
-  | "unpushed"
+  | "unique_patches"
 
 export interface DeletionDecision {
   readonly deletable: boolean
@@ -37,12 +37,10 @@ export const evaluateDeletion = (status: WorktreeStatus): DeletionDecision => {
     reasons.push("untracked")
   }
 
-  if (status.upstream === undefined) {
-    reasons.push("missing_upstream")
-  }
-
-  if (status.ahead > 0) {
-    reasons.push("unpushed")
+  if (status.committedWork === undefined) {
+    reasons.push("missing_default_branch")
+  } else if (status.committedWork.uniquePatchCount > 0) {
+    reasons.push("unique_patches")
   }
 
   return {

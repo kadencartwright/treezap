@@ -20,6 +20,11 @@ const git = (
     }
   })
 
+const setDefaultRemoteBranch = (root: string, remote: string, repo: string): void => {
+  git(root, ["--git-dir", remote, "symbolic-ref", "HEAD", "refs/heads/main"])
+  git(repo, ["remote", "set-head", "origin", "-a"])
+}
+
 test("rm-old deletes eligible linked worktrees and skips unsafe linked worktrees", (t) => {
   const root = mkdtempSync(join(tmpdir(), "treezap-cli-rm-old-"))
   t.after(() => rmSync(root, { recursive: true, force: true }))
@@ -41,6 +46,7 @@ test("rm-old deletes eligible linked worktrees and skips unsafe linked worktrees
   git(repo, ["add", "README.md"])
   git(repo, ["commit", "--quiet", "-m", "old commit"], { date: oldDate })
   git(repo, ["push", "--quiet", "--set-upstream", "origin", "main"])
+  setDefaultRemoteBranch(root, remote, repo)
 
   git(repo, ["branch", "feature/delete-me"])
   git(repo, ["push", "--quiet", "--set-upstream", "origin", "feature/delete-me"])

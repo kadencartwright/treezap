@@ -53,6 +53,18 @@ assert_contains "$untracked_status" "?? untracked.txt"
 assert_no_upstream /workspace/worktrees/alpha-old-unpushed
 
 treezap --help >/dev/null
+candidate_counts=$(treezap candidates /workspace/projects --min-age 30d --count)
+assert_contains "$candidate_counts" "deletable: 2"
+assert_contains "$candidate_counts" "old_enough_blocked:"
+assert_contains "$candidate_counts" "blocked_unique_patches:"
+
+equivalent_status=$(treezap stat /workspace/worktrees/alpha-old-clean)
+assert_contains "$equivalent_status" '"uniquePatchCount": 0'
+assert_contains "$equivalent_status" '"equivalentPatchCount": 1'
+
+unique_status=$(treezap stat /workspace/worktrees/alpha-old-unpushed)
+assert_contains "$unique_status" '"uniquePatchCount": 1'
+assert_contains "$unique_status" '"unique_patches"'
 
 cat <<'EOF'
 Fixture check passed.

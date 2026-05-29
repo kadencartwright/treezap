@@ -47,5 +47,5 @@ test("stat command prints JSON safety facts for a clean repository", (t) => {
   assert.equal(parsed.ahead, 0)
   assert.equal(parsed.behind, 0)
   assert.equal(parsed.deletable, false)
-  assert.deepEqual(parsed.reasons, ["missing_upstream"])
+  assert.deepEqual(parsed.reasons, ["missing_default_branch"])
 })

@@ -1,5 +1,6 @@
 import { Effect } from "effect"
 
+import { inspectCommittedWork, type CommittedWorkStatus } from "./committedWork"
 import { runGit, type GitCommandError } from "./git"
 import type { WorktreePorcelainStatus } from "./worktreePorcelain"
 
@@ -14,6 +15,7 @@ export interface WorktreeStatus {
   readonly untracked: boolean
   readonly ahead: number
   readonly behind: number
+  readonly committedWork?: CommittedWorkStatus
   readonly lastCommitAt: string
 }
 
@@ -28,6 +30,7 @@ export const inspectPath = (path: string): Effect.Effect<WorktreeStatus, StatusE
     const status = yield* runGit(path, ["status", "--porcelain"])
     const upstream = yield* getUpstream(path)
     const upstreamDivergence = yield* getUpstreamDivergence(path, upstream)
+    const committedWork = yield* inspectCommittedWork(path)
 
     return {
       path,
@@ -40,7 +43,8 @@ export const inspectPath = (path: string): Effect.Effect<WorktreeStatus, StatusE
       dirty: hasTrackedChanges(status.stdout),
       untracked: hasUntrackedChanges(status.stdout),
       ahead: upstreamDivergence.ahead,
-      behind: upstreamDivergence.behind
+      behind: upstreamDivergence.behind,
+      committedWork
     }
   })
 

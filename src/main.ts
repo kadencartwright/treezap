@@ -50,8 +50,8 @@ const formatCandidateCounts = (counts: CandidateCounts): string =>
     `old_enough_blocked: ${counts.oldEnoughBlocked.total}`,
     `blocked_dirty: ${counts.oldEnoughBlocked.reasons.dirty}`,
     `blocked_untracked: ${counts.oldEnoughBlocked.reasons.untracked}`,
-    `blocked_missing_upstream: ${counts.oldEnoughBlocked.reasons.missing_upstream}`,
-    `blocked_unpushed: ${counts.oldEnoughBlocked.reasons.unpushed}`
+    `blocked_missing_default_branch: ${counts.oldEnoughBlocked.reasons.missing_default_branch}`,
+    `blocked_unique_patches: ${counts.oldEnoughBlocked.reasons.unique_patches}`
   ].join("\n")
 
 const scan = Command.make(

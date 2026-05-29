@@ -20,6 +20,11 @@ const git = (
     }
   })
 
+const setDefaultRemoteBranch = (root: string, remote: string, repo: string): void => {
+  git(root, ["--git-dir", remote, "symbolic-ref", "HEAD", "refs/heads/main"])
+  git(repo, ["remote", "set-head", "origin", "-a"])
+}
+
 test("rm command deletes an eligible linked worktree", (t) => {
   const root = mkdtempSync(join(tmpdir(), "treezap-cli-rm-"))
   t.after(() => rmSync(root, { recursive: true, force: true }))
@@ -39,6 +44,7 @@ test("rm command deletes an eligible linked worktree", (t) => {
   git(repo, ["add", "README.md"])
   git(repo, ["commit", "--quiet", "-m", "old commit"], { date: oldDate })
   git(repo, ["push", "--quiet", "--set-upstream", "origin", "main"])
+  setDefaultRemoteBranch(root, remote, repo)
   git(repo, ["branch", "feature/delete-me"])
   git(repo, ["push", "--quiet", "--set-upstream", "origin", "feature/delete-me"])
   git(repo, ["worktree", "add", "--quiet", linkedWorktree, "feature/delete-me"])
@@ -86,6 +92,7 @@ test("rm command does not delete an unsafe linked worktree", (t) => {
   git(repo, ["add", "README.md"])
   git(repo, ["commit", "--quiet", "-m", "old commit"], { date: oldDate })
   git(repo, ["push", "--quiet", "--set-upstream", "origin", "main"])
+  setDefaultRemoteBranch(root, remote, repo)
   git(repo, ["branch", "feature/keep-me"])
   git(repo, ["push", "--quiet", "--set-upstream", "origin", "feature/keep-me"])
   git(repo, ["worktree", "add", "--quiet", linkedWorktree, "feature/keep-me"])
@@ -106,5 +113,105 @@ test("rm command does not delete an unsafe linked worktree", (t) => {
   assert.equal(parsed.deleted, false)
   assert.equal(parsed.eligible, false)
   assert.deepEqual(parsed.decision.reasons, ["dirty"])
+  assert.equal(existsSync(linkedWorktree), true)
+})
+
+test("rm command deletes a clean no-upstream worktree with no unique patches", (t) => {
+  const root = mkdtempSync(join(tmpdir(), "treezap-cli-rm-"))
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+
+  const oldDate = new Date(Date.now() - 45 * 24 * 60 * 60 * 1000)
+  const remote = join(root, "remote.git")
+  const repo = join(root, "repo")
+  const linkedWorktree = join(root, "linked-worktree")
+
+  git(root, ["init", "--quiet", "--bare", remote])
+  git(root, ["clone", "--quiet", remote, repo])
+  git(repo, ["switch", "--quiet", "-c", "main"])
+  git(repo, ["config", "user.email", "treezap-test@example.test"])
+  git(repo, ["config", "user.name", "Sentinel Test"])
+
+  writeFileSync(join(repo, "README.md"), "# test repo\n")
+  git(repo, ["add", "README.md"])
+  git(repo, ["commit", "--quiet", "-m", "old commit"], { date: oldDate })
+  git(repo, ["push", "--quiet", "--set-upstream", "origin", "main"])
+
+  git(repo, ["switch", "--quiet", "-c", "feature/equivalent"])
+  writeFileSync(join(repo, "equivalent.txt"), "same patch\n")
+  git(repo, ["add", "equivalent.txt"])
+  git(repo, ["commit", "--quiet", "-m", "feature equivalent commit"], { date: oldDate })
+
+  git(repo, ["switch", "--quiet", "main"])
+  writeFileSync(join(repo, "equivalent.txt"), "same patch\n")
+  git(repo, ["add", "equivalent.txt"])
+  git(repo, ["commit", "--quiet", "-m", "main equivalent commit"], { date: oldDate })
+  git(repo, ["push", "--quiet"])
+  setDefaultRemoteBranch(root, remote, repo)
+
+  git(repo, ["worktree", "add", "--quiet", linkedWorktree, "feature/equivalent"])
+
+  const output = execFileSync(
+    process.execPath,
+    ["--import", "tsx", "src/main.ts", "rm", linkedWorktree, "--min-age", "30d"],
+    {
+      cwd: process.cwd(),
+      encoding: "utf8"
+    }
+  )
+  const parsed = JSON.parse(output)
+
+  assert.equal(parsed.deleted, true)
+  assert.deepEqual(parsed.decision, {
+    deletable: true,
+    reasons: []
+  })
+  assert.equal(parsed.status.upstream, undefined)
+  assert.equal(parsed.status.committedWork.uniquePatchCount, 0)
+  assert.equal(parsed.status.committedWork.equivalentPatchCount, 1)
+  assert.equal(existsSync(linkedWorktree), false)
+})
+
+test("rm command refuses a clean no-upstream worktree with unique patches", (t) => {
+  const root = mkdtempSync(join(tmpdir(), "treezap-cli-rm-"))
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+
+  const oldDate = new Date(Date.now() - 45 * 24 * 60 * 60 * 1000)
+  const remote = join(root, "remote.git")
+  const repo = join(root, "repo")
+  const linkedWorktree = join(root, "linked-worktree")
+
+  git(root, ["init", "--quiet", "--bare", remote])
+  git(root, ["clone", "--quiet", remote, repo])
+  git(repo, ["switch", "--quiet", "-c", "main"])
+  git(repo, ["config", "user.email", "treezap-test@example.test"])
+  git(repo, ["config", "user.name", "Sentinel Test"])
+
+  writeFileSync(join(repo, "README.md"), "# test repo\n")
+  git(repo, ["add", "README.md"])
+  git(repo, ["commit", "--quiet", "-m", "old commit"], { date: oldDate })
+  git(repo, ["push", "--quiet", "--set-upstream", "origin", "main"])
+  setDefaultRemoteBranch(root, remote, repo)
+
+  git(repo, ["switch", "--quiet", "-c", "feature/unique"])
+  writeFileSync(join(repo, "unique.txt"), "unique patch\n")
+  git(repo, ["add", "unique.txt"])
+  git(repo, ["commit", "--quiet", "-m", "feature unique commit"], { date: oldDate })
+  git(repo, ["switch", "--quiet", "main"])
+  git(repo, ["worktree", "add", "--quiet", linkedWorktree, "feature/unique"])
+
+  const output = execFileSync(
+    process.execPath,
+    ["--import", "tsx", "src/main.ts", "rm", linkedWorktree, "--min-age", "30d"],
+    {
+      cwd: process.cwd(),
+      encoding: "utf8"
+    }
+  )
+  const parsed = JSON.parse(output)
+
+  assert.equal(parsed.deleted, false)
+  assert.deepEqual(parsed.decision.reasons, ["unique_patches"])
+  assert.equal(parsed.status.upstream, undefined)
+  assert.equal(parsed.status.committedWork.uniquePatchCount, 1)
   assert.equal(existsSync(linkedWorktree), true)
 })

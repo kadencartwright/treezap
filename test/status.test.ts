@@ -20,6 +20,11 @@ const git = (cwd: string, args: ReadonlyArray<string>): string =>
     }
   })
 
+const setDefaultRemoteBranch = (root: string, remote: string, repo: string): void => {
+  git(root, ["--git-dir", remote, "symbolic-ref", "HEAD", "refs/heads/main"])
+  git(repo, ["remote", "set-head", "origin", "-a"])
+}
+
 test("inspects a clean repository with no upstream", async (t) => {
   const root = mkdtempSync(join(tmpdir(), "treezap-status-"))
   t.after(() => rmSync(root, { recursive: true, force: true }))
@@ -91,6 +96,7 @@ test("inspects upstream and ahead count", async (t) => {
   git(repo, ["add", "README.md"])
   git(repo, ["commit", "--quiet", "-m", "initial commit"])
   git(repo, ["push", "--quiet", "--set-upstream", "origin", "main"])
+  setDefaultRemoteBranch(root, remote, repo)
 
   writeFileSync(join(repo, "local.txt"), "local\n")
   git(repo, ["add", "local.txt"])
@@ -101,6 +107,50 @@ test("inspects upstream and ahead count", async (t) => {
   assert.equal(status.upstream, "origin/main")
   assert.equal(status.ahead, 1)
   assert.equal(status.behind, 0)
+  assert.equal(status.committedWork?.base, "origin/main")
+  assert.equal(status.committedWork?.uniquePatchCount, 1)
+  assert.equal(status.committedWork?.equivalentPatchCount, 0)
+})
+
+test("inspects patch-equivalent committed work relative to the default branch", async (t) => {
+  const root = mkdtempSync(join(tmpdir(), "treezap-status-"))
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+
+  const remote = join(root, "remote.git")
+  const repo = join(root, "repo")
+  const worktree = join(root, "equivalent-worktree")
+
+  git(root, ["init", "--quiet", "--bare", remote])
+  git(root, ["clone", "--quiet", remote, repo])
+  git(repo, ["switch", "--quiet", "-c", "main"])
+  git(repo, ["config", "user.email", "treezap-test@example.test"])
+  git(repo, ["config", "user.name", "Sentinel Test"])
+
+  writeFileSync(join(repo, "README.md"), "# test repo\n")
+  git(repo, ["add", "README.md"])
+  git(repo, ["commit", "--quiet", "-m", "initial commit"])
+  git(repo, ["push", "--quiet", "--set-upstream", "origin", "main"])
+
+  git(repo, ["switch", "--quiet", "-c", "feature/equivalent"])
+  writeFileSync(join(repo, "equivalent.txt"), "same patch\n")
+  git(repo, ["add", "equivalent.txt"])
+  git(repo, ["commit", "--quiet", "-m", "feature equivalent commit"])
+
+  git(repo, ["switch", "--quiet", "main"])
+  writeFileSync(join(repo, "equivalent.txt"), "same patch\n")
+  git(repo, ["add", "equivalent.txt"])
+  git(repo, ["commit", "--quiet", "-m", "main equivalent commit"])
+  git(repo, ["push", "--quiet"])
+  setDefaultRemoteBranch(root, remote, repo)
+
+  git(repo, ["worktree", "add", "--quiet", worktree, "feature/equivalent"])
+
+  const status = await Effect.runPromise(inspectPath(worktree))
+
+  assert.equal(status.committedWork?.base, "origin/main")
+  assert.equal(status.committedWork?.uniquePatchCount, 0)
+  assert.equal(status.committedWork?.equivalentPatchCount, 1)
+  assert.equal(status.committedWork?.equivalentCommits.length, 1)
 })
 
 test("inspects a detached repository", async (t) => {

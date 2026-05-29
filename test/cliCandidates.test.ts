@@ -20,10 +20,16 @@ const git = (
     }
   })
 
+const setDefaultRemoteBranch = (root: string, remote: string, repo: string): void => {
+  git(root, ["--git-dir", remote, "symbolic-ref", "HEAD", "refs/heads/main"])
+  git(repo, ["remote", "set-head", "origin", "-a"])
+}
+
 const seedCandidateFixture = (t: test.TestContext): {
   readonly dirtyWorktree: string
   readonly root: string
   readonly oldWorktree: string
+  readonly uniqueWorktree: string
 } => {
   const root = mkdtempSync(join(tmpdir(), "treezap-cli-candidates-"))
   t.after(() => rmSync(root, { recursive: true, force: true }))
@@ -33,6 +39,7 @@ const seedCandidateFixture = (t: test.TestContext): {
   const repo = join(root, "repo")
   const oldWorktree = join(root, "old-worktree")
   const dirtyWorktree = join(root, "dirty-worktree")
+  const uniqueWorktree = join(root, "unique-worktree")
   const missingWorktree = join(root, "missing-worktree")
 
   git(root, ["init", "--quiet", "--bare", remote])
@@ -45,6 +52,7 @@ const seedCandidateFixture = (t: test.TestContext): {
   git(repo, ["add", "README.md"])
   git(repo, ["commit", "--quiet", "-m", "old commit"], { date: oldDate })
   git(repo, ["push", "--quiet", "--set-upstream", "origin", "main"])
+  setDefaultRemoteBranch(root, remote, repo)
 
   git(repo, ["branch", "feature/old"])
   git(repo, ["push", "--quiet", "--set-upstream", "origin", "feature/old"])
@@ -55,6 +63,14 @@ const seedCandidateFixture = (t: test.TestContext): {
   git(repo, ["worktree", "add", "--quiet", dirtyWorktree, "feature/dirty"])
   writeFileSync(join(dirtyWorktree, "README.md"), "# dirty repo\n")
 
+  git(repo, ["switch", "--quiet", "main"])
+  git(repo, ["switch", "--quiet", "-c", "feature/unique"])
+  writeFileSync(join(repo, "unique.txt"), "unique patch\n")
+  git(repo, ["add", "unique.txt"])
+  git(repo, ["commit", "--quiet", "-m", "feature unique commit"], { date: oldDate })
+  git(repo, ["switch", "--quiet", "main"])
+  git(repo, ["worktree", "add", "--quiet", uniqueWorktree, "feature/unique"])
+
   git(repo, ["branch", "feature/missing"])
   git(repo, ["push", "--quiet", "--set-upstream", "origin", "feature/missing"])
   git(repo, ["worktree", "add", "--quiet", missingWorktree, "feature/missing"])
@@ -63,12 +79,13 @@ const seedCandidateFixture = (t: test.TestContext): {
   return {
     dirtyWorktree,
     root,
-    oldWorktree
+    oldWorktree,
+    uniqueWorktree
   }
 }
 
 test("candidates command prints safe and safety-blocked worktrees older than the minimum age", (t) => {
-  const { dirtyWorktree, oldWorktree, root } = seedCandidateFixture(t)
+  const { dirtyWorktree, oldWorktree, root, uniqueWorktree } = seedCandidateFixture(t)
 
   const output = execFileSync(
     process.execPath,
@@ -88,14 +105,25 @@ test("candidates command prints safe and safety-blocked worktrees older than the
   )
   assert.equal(parsed.candidates[0].decision.deletable, true)
   assert.deepEqual(
-    parsed.blockedCandidates.map((candidate: { path: string }) => candidate.path),
-    [dirtyWorktree]
+    parsed.blockedCandidates.map((candidate: { path: string }) => candidate.path).sort(),
+    [dirtyWorktree, uniqueWorktree].sort()
   )
-  assert.deepEqual(parsed.blockedCandidates[0].decision, {
+  const dirtyCandidate = parsed.blockedCandidates.find(
+    (candidate: { path: string }) => candidate.path === dirtyWorktree
+  )
+  const uniqueCandidate = parsed.blockedCandidates.find(
+    (candidate: { path: string }) => candidate.path === uniqueWorktree
+  )
+  assert.deepEqual(dirtyCandidate.decision, {
     deletable: false,
     reasons: ["dirty"]
   })
-  assert.equal(parsed.blockedCandidates[0].status.dirty, true)
+  assert.equal(dirtyCandidate.status.dirty, true)
+  assert.deepEqual(uniqueCandidate.decision, {
+    deletable: false,
+    reasons: ["unique_patches"]
+  })
+  assert.equal(uniqueCandidate.status.committedWork.uniquePatchCount, 1)
 })
 
 test("candidates command can print only the count summary", (t) => {
@@ -114,11 +142,11 @@ test("candidates command can print only the count summary", (t) => {
     output,
     [
       "deletable: 1",
-      "old_enough_blocked: 1",
+      "old_enough_blocked: 2",
       "blocked_dirty: 1",
       "blocked_untracked: 0",
-      "blocked_missing_upstream: 0",
-      "blocked_unpushed: 0",
+      "blocked_missing_default_branch: 0",
+      "blocked_unique_patches: 1",
       ""
     ].join("\n")
   )
@@ -144,5 +172,5 @@ test("candidates command prints repo and worktree progress to stderr", (t) => {
   assert.match(result.stdout, /deletable: 1/)
   assert.match(result.stderr, /treezap: checking repos \[/)
   assert.match(result.stderr, /treezap: inspecting worktrees \[/)
-  assert.match(result.stderr, /2\/2 worktrees/)
+  assert.match(result.stderr, /3\/3 worktrees/)
 })

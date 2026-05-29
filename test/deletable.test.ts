@@ -14,32 +14,53 @@ const cleanStatus = (overrides: Partial<WorktreeStatus> = {}): WorktreeStatus =>
   untracked: false,
   ahead: 0,
   behind: 0,
+  committedWork: {
+    base: "origin/main",
+    uniquePatchCount: 0,
+    equivalentPatchCount: 0,
+    uniqueCommits: [],
+    equivalentCommits: []
+  },
   lastCommitAt: "2026-01-01T12:00:00Z",
   ...overrides
 })
 
-test("marks a clean repository with no upstream as not deletable", () => {
-  assert.deepEqual(evaluateDeletion(cleanStatus()), {
+test("marks a clean worktree with no default branch as not deletable", () => {
+  assert.deepEqual(evaluateDeletion(cleanStatus({ committedWork: undefined })), {
     deletable: false,
-    reasons: ["missing_upstream"]
+    reasons: ["missing_default_branch"]
   })
 })
 
-test("marks dirty, untracked, and ahead worktrees as not deletable", () => {
+test("marks dirty, untracked, and unique-patch worktrees as not deletable", () => {
   assert.deepEqual(
     evaluateDeletion(
       cleanStatus({
         upstream: "origin/main",
         dirty: true,
         untracked: true,
-        ahead: 1
+        ahead: 1,
+        committedWork: {
+          base: "origin/main",
+          uniquePatchCount: 1,
+          equivalentPatchCount: 0,
+          uniqueCommits: [{ hash: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" }],
+          equivalentCommits: []
+        }
       })
     ),
     {
       deletable: false,
-      reasons: ["dirty", "untracked", "unpushed"]
+      reasons: ["dirty", "untracked", "unique_patches"]
     }
   )
+})
+
+test("does not use missing upstream as a hard blocker when default-branch patches are equivalent", () => {
+  assert.deepEqual(evaluateDeletion(cleanStatus({ upstream: undefined, ahead: 1 })), {
+    deletable: true,
+    reasons: []
+  })
 })
 
 test("selects only safe worktrees older than the minimum age", () => {
@@ -60,6 +81,7 @@ test("selects only safe worktrees older than the minimum age", () => {
         }),
         cleanStatus({
           path: "/old-unsafe",
+          committedWork: undefined,
           lastCommitAt: "2026-04-01T12:00:00Z"
         })
       ],

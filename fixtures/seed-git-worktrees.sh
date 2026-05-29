@@ -36,6 +36,14 @@ push_branch() {
   git -C "$repo" push -u origin "$branch" >/dev/null 2>&1
 }
 
+set_default_remote_branch() {
+  local repo=$1
+  local remote=$2
+
+  git --git-dir "$remote" symbolic-ref HEAD refs/heads/main
+  git -C "$repo" remote set-head origin -a >/dev/null 2>&1
+}
+
 create_remote_repo() {
   local name=$1
   local repo="$PROJECTS/$name"
@@ -47,6 +55,7 @@ create_remote_repo() {
   echo "# $name" > "$repo/README.md"
   commit_all "$repo" "initial commit" 120
   push_branch "$repo" main
+  set_default_remote_branch "$repo" "$remote"
 }
 
 create_worktree() {
@@ -70,8 +79,33 @@ create_worktree() {
   git -C "$repo" worktree add "$path" "$branch" >/dev/null 2>&1
 }
 
+create_equivalent_worktree() {
+  local repo=$1
+  local branch=$2
+  local path=$3
+  local days_ago=$4
+  local remote
+
+  remote=$(git -C "$repo" config --get remote.origin.url)
+
+  git -C "$repo" switch main >/dev/null 2>&1
+  git -C "$repo" switch -c "$branch" >/dev/null 2>&1
+  mkdir -p "$repo/fixtures"
+  echo "$branch patch-equivalent $days_ago days ago" > "$repo/fixtures/$branch.txt"
+  commit_all "$repo" "$branch fixture commit" "$days_ago"
+
+  git -C "$repo" switch main >/dev/null 2>&1
+  mkdir -p "$repo/fixtures"
+  echo "$branch patch-equivalent $days_ago days ago" > "$repo/fixtures/$branch.txt"
+  commit_all "$repo" "$branch equivalent default-branch commit" "$days_ago"
+  git -C "$repo" push origin main >/dev/null 2>&1
+  set_default_remote_branch "$repo" "$remote"
+
+  git -C "$repo" worktree add "$path" "$branch" >/dev/null 2>&1
+}
+
 create_remote_repo alpha
-create_worktree "$PROJECTS/alpha" old-clean "$WORKTREES/alpha-old-clean" 45 yes
+create_equivalent_worktree "$PROJECTS/alpha" old-clean "$WORKTREES/alpha-old-clean" 45
 create_worktree "$PROJECTS/alpha" recent-clean "$WORKTREES/alpha-recent-clean" 5 yes
 create_worktree "$PROJECTS/alpha" old-dirty "$TOOL_WORKTREES/alpha-old-dirty" 60 yes
 echo "unstaged local edit" >> "$TOOL_WORKTREES/alpha-old-dirty/fixtures/old-dirty.txt"
@@ -80,7 +114,7 @@ echo "untracked local file" > "$OTHER_WORKTREES/alpha-old-untracked/untracked.tx
 create_worktree "$PROJECTS/alpha" old-unpushed "$WORKTREES/alpha-old-unpushed" 50 no
 
 create_remote_repo beta
-create_worktree "$PROJECTS/beta" stale-clean "$TOOL_WORKTREES/beta-stale-clean" 90 yes
+create_equivalent_worktree "$PROJECTS/beta" stale-clean "$TOOL_WORKTREES/beta-stale-clean" 90
 create_worktree "$PROJECTS/beta" threshold-edge "$WORKTREES/beta-threshold-edge" 30 yes
 
 cat > "$ROOT/FIXTURE.md" <<EOF
@@ -98,12 +132,12 @@ Worktree locations intentionally vary:
 
 Seeded cases:
 
-- alpha old-clean: clean, pushed, 45 days old, should be eligible with --min-age 30d.
+- alpha old-clean: clean, patch-equivalent to the default branch, 45 days old, should be eligible with --min-age 30d.
 - alpha recent-clean: clean, pushed, 5 days old, should be skipped with --min-age 30d.
 - alpha old-dirty: pushed and old, but has unstaged changes, should be refused.
 - alpha old-untracked: pushed and old, but has an untracked file, should be refused.
-- alpha old-unpushed: old with local commits not pushed, should be refused.
-- beta stale-clean: clean, pushed, 90 days old, should be eligible with --min-age 30d.
+- alpha old-unpushed: old with unique patches not on the default branch, should be refused.
+- beta stale-clean: clean, patch-equivalent to the default branch, 90 days old, should be eligible with --min-age 30d.
 - beta threshold-edge: clean, pushed, exactly 30 days old, useful for boundary behavior.
 
 Useful commands:

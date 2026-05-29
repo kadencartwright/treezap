@@ -57,9 +57,9 @@ const summarizeCandidateCounts = (
       total: input.blockedCandidates.length,
       reasons: {
         dirty: 0,
-        missing_upstream: 0,
+        missing_default_branch: 0,
         untracked: 0,
-        unpushed: 0
+        unique_patches: 0
       }
     }
   }

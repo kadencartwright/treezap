@@ -46,8 +46,8 @@ deletable: 15
 old_enough_blocked: 116
 blocked_dirty: 31
 blocked_untracked: 16
-blocked_missing_upstream: 106
-blocked_unpushed: 1
+blocked_missing_default_branch: 0
+blocked_unique_patches: 27
 ```
 
 Delete eligible linked worktrees:
@@ -75,10 +75,12 @@ A worktree is not deleted unless it is:
 - older than the minimum age
 - clean, with no tracked changes
 - free of untracked files
-- connected to an upstream branch
-- not ahead of its upstream
+- able to identify the repository default branch
+- free of unique committed patches relative to the default branch
 
 Bulk deletion skips primary repository checkouts. It only deletes linked worktrees discovered through `git worktree list`.
+
+Treezap uses `refs/remotes/origin/HEAD` as the default branch signal and `git cherry <default-branch> HEAD` to distinguish committed work that is patch-equivalent to the default branch from committed work that still has unique patches. Missing upstream metadata is diagnostic; it is not a deletion blocker when committed patches are already represented on the default branch.
 
 `--min-age` accepts case-insensitive durations:
 
