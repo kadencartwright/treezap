@@ -29,6 +29,7 @@ test("rm-old deletes eligible linked worktrees and skips unsafe linked worktrees
   const repo = join(root, "repo")
   const deleteMe = join(root, "delete-me")
   const keepMe = join(root, "keep-me")
+  const missingWorktree = join(root, "missing-worktree")
 
   git(root, ["init", "--quiet", "--bare", remote])
   git(root, ["clone", "--quiet", remote, repo])
@@ -49,6 +50,11 @@ test("rm-old deletes eligible linked worktrees and skips unsafe linked worktrees
   git(repo, ["push", "--quiet", "--set-upstream", "origin", "feature/keep-me"])
   git(repo, ["worktree", "add", "--quiet", keepMe, "feature/keep-me"])
   writeFileSync(join(keepMe, "README.md"), "# changed repo\n")
+
+  git(repo, ["branch", "feature/missing"])
+  git(repo, ["push", "--quiet", "--set-upstream", "origin", "feature/missing"])
+  git(repo, ["worktree", "add", "--quiet", missingWorktree, "feature/missing"])
+  rmSync(missingWorktree, { recursive: true, force: true })
 
   const output = execFileSync(
     process.execPath,

@@ -13,9 +13,13 @@ test("help shows the raw command surface", () => {
 
   assert.match(help, /scan <root>\s+List repos and worktrees\./)
   assert.match(help, /stat <path>\s+Inspect one path\./)
-  assert.match(help, /candidates \[--min-age duration\] <root>\s+List deletable worktrees\./)
-  assert.match(help, /rm \[--min-age duration\] <path>\s+Delete one eligible worktree\./)
-  assert.match(help, /rm-old \[--min-age duration\] <root>\s+Delete eligible linked worktrees\./)
+  assert.match(help, /candidates <root> \[--min-age duration\] \[--count\]\s+List deletable worktrees\./)
+  assert.match(help, /rm <path> \[--min-age duration\]\s+Delete one eligible worktree\./)
+  assert.match(help, /rm-old <root> \[--min-age duration\]\s+Delete eligible linked worktrees\./)
+  assert.doesNotMatch(help, /\n\n\n/)
+  assert.doesNotMatch(help, /--wizard/)
+  assert.doesNotMatch(help, /--completions/)
+  assert.doesNotMatch(help, /--log-level/)
   assert.doesNotMatch(help, /agent-help/)
   assert.doesNotMatch(help, /not_implemented/)
 })
@@ -33,4 +37,20 @@ test("command help documents min-age duration examples", () => {
 
   assert.match(help, /\[--min-age duration\]/)
   assert.match(help, /Minimum age\. Examples: 30d, 2w, 1m, 1y\./)
+  assert.doesNotMatch(help, /\n\n\n/)
+})
+
+test("candidates help documents count output", () => {
+  const output = execFileSync(
+    process.execPath,
+    ["--import", "tsx", "src/main.ts", "candidates", "--help"],
+    {
+      cwd: process.cwd(),
+      encoding: "utf8"
+    }
+  )
+  const help = stripAnsi(output)
+
+  assert.match(help, /\[--count\]/)
+  assert.match(help, /--count\s+Print only the count summary\./)
 })

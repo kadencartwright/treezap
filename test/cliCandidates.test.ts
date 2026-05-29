@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { execFileSync } from "node:child_process"
+import { execFileSync, spawnSync } from "node:child_process"
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -20,15 +20,19 @@ const git = (
     }
   })
 
-test("candidates command prints safe worktrees older than the minimum age", (t) => {
+const seedCandidateFixture = (t: test.TestContext): {
+  readonly root: string
+  readonly oldWorktree: string
+} => {
   const root = mkdtempSync(join(tmpdir(), "treezap-cli-candidates-"))
   t.after(() => rmSync(root, { recursive: true, force: true }))
 
   const oldDate = new Date(Date.now() - 45 * 24 * 60 * 60 * 1000)
-  const youngDate = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000)
   const remote = join(root, "remote.git")
   const repo = join(root, "repo")
   const oldWorktree = join(root, "old-worktree")
+  const dirtyWorktree = join(root, "dirty-worktree")
+  const missingWorktree = join(root, "missing-worktree")
 
   git(root, ["init", "--quiet", "--bare", remote])
   git(root, ["clone", "--quiet", remote, repo])
@@ -45,10 +49,24 @@ test("candidates command prints safe worktrees older than the minimum age", (t) 
   git(repo, ["push", "--quiet", "--set-upstream", "origin", "feature/old"])
   git(repo, ["worktree", "add", "--quiet", oldWorktree, "feature/old"])
 
-  writeFileSync(join(repo, "young.txt"), "young\n")
-  git(repo, ["add", "young.txt"])
-  git(repo, ["commit", "--quiet", "-m", "young commit"], { date: youngDate })
-  git(repo, ["push", "--quiet"])
+  git(repo, ["branch", "feature/dirty"])
+  git(repo, ["push", "--quiet", "--set-upstream", "origin", "feature/dirty"])
+  git(repo, ["worktree", "add", "--quiet", dirtyWorktree, "feature/dirty"])
+  writeFileSync(join(dirtyWorktree, "README.md"), "# dirty repo\n")
+
+  git(repo, ["branch", "feature/missing"])
+  git(repo, ["push", "--quiet", "--set-upstream", "origin", "feature/missing"])
+  git(repo, ["worktree", "add", "--quiet", missingWorktree, "feature/missing"])
+  rmSync(missingWorktree, { recursive: true, force: true })
+
+  return {
+    root,
+    oldWorktree
+  }
+}
+
+test("candidates command prints safe worktrees older than the minimum age", (t) => {
+  const { oldWorktree, root } = seedCandidateFixture(t)
 
   const output = execFileSync(
     process.execPath,
@@ -67,4 +85,53 @@ test("candidates command prints safe worktrees older than the minimum age", (t) 
     [oldWorktree]
   )
   assert.equal(parsed.candidates[0].decision.deletable, true)
+})
+
+test("candidates command can print only the count summary", (t) => {
+  const { root } = seedCandidateFixture(t)
+
+  const output = execFileSync(
+    process.execPath,
+    ["--import", "tsx", "src/main.ts", "candidates", root, "--min-age", "30d", "--count"],
+    {
+      cwd: process.cwd(),
+      encoding: "utf8"
+    }
+  )
+
+  assert.equal(
+    output,
+    [
+      "deletable: 1",
+      "old_enough_blocked: 1",
+      "blocked_dirty: 1",
+      "blocked_untracked: 0",
+      "blocked_missing_upstream: 0",
+      "blocked_unpushed: 0",
+      ""
+    ].join("\n")
+  )
+})
+
+test("candidates command prints repo and worktree progress to stderr", (t) => {
+  const { root } = seedCandidateFixture(t)
+
+  const result = spawnSync(
+    process.execPath,
+    ["--import", "tsx", "src/main.ts", "candidates", root, "--min-age", "30d", "--count"],
+    {
+      cwd: process.cwd(),
+      env: {
+        ...process.env,
+        TREEZAP_PROGRESS: "1"
+      },
+      encoding: "utf8"
+    }
+  )
+
+  assert.equal(result.status, 0)
+  assert.match(result.stdout, /deletable: 1/)
+  assert.match(result.stderr, /treezap: checking repos \[/)
+  assert.match(result.stderr, /treezap: inspecting worktrees \[/)
+  assert.match(result.stderr, /2\/2 worktrees/)
 })

@@ -3,6 +3,14 @@
 	"version": "0.1.0",
 	"description": "CLI primitives for discovering and deleting stale Git worktrees.",
 	"type": "module",
+	"homepage": "https://github.com/kadencartwright/treezap#readme",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/kadencartwright/treezap.git"
+	},
+	"bugs": {
+		"url": "https://github.com/kadencartwright/treezap/issues"
+	},
 	"bin": {
 		"treezap": "./dist/main.cjs"
 	},
@@ -17,6 +25,7 @@
 		"prepack": "npm run build"
 	},
 	"files": [
+		"assets",
 		"dist"
 	],
 	"dependencies": {

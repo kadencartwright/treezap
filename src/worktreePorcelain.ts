@@ -22,6 +22,13 @@ export interface WorktreePorcelainEntry {
   readonly annotations: ReadonlyArray<WorktreePorcelainAnnotation>
 }
 
+export const isInspectableLinkedWorktree = (
+  repositoryPath: string,
+  worktree: WorktreePorcelainEntry
+): boolean =>
+  worktree.path !== repositoryPath &&
+  !worktree.annotations.some((annotation) => annotation.kind === "prunable")
+
 type Mutable<T> = {
   -readonly [Key in keyof T]: T[Key]
 }

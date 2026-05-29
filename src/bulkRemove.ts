@@ -1,9 +1,10 @@
 import { Effect, Either } from "effect"
 
 import { removePath, type RemoveEvaluationResult } from "./remove"
-import { collectScanRoot, type ScanRootError } from "./scan"
+import { collectScanRoot, type ScanOptions, type ScanRootError } from "./scan"
+import { isInspectableLinkedWorktree } from "./worktreePorcelain"
 
-export interface BulkRemoveOptions {
+export interface BulkRemoveOptions extends ScanOptions {
   readonly minimumAgeDays?: number
 }
 
@@ -34,13 +35,13 @@ export const removeOldWorktrees = (
 ): Effect.Effect<BulkRemoveResult, ScanRootError> =>
   Effect.gen(function* () {
     const minimumAgeDays = options.minimumAgeDays ?? defaultMinimumAgeDays
-    const scan = yield* collectScanRoot(root)
+    const scan = yield* collectScanRoot(root, options)
     const deleted: Array<RemoveEvaluationResult> = []
     const skipped: Array<RemoveEvaluationResult> = []
     const failed: Array<BulkRemoveFailure> = []
     const linkedWorktrees = scan.repositories.flatMap((repository) =>
       repository.worktrees
-        .filter((worktree) => worktree.path !== repository.path)
+        .filter((worktree) => isInspectableLinkedWorktree(repository.path, worktree))
         .map((worktree) => worktree.path)
     )
 

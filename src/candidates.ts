@@ -1,41 +1,147 @@
-import { Effect, Stream } from "effect"
+import { Effect, Ref, Stream } from "effect"
 
 import {
+  calculateAgeDays,
+  evaluateDeletion,
   selectDeletionCandidates,
   type CandidateSelectionOptions,
-  type DeletionCandidate
+  type DeletionCandidate,
+  type DeletionReason
 } from "./deletable"
-import { scanRoot, type ScanRootError } from "./scan"
-import { inspectPath, type StatusError } from "./status"
+import { clearProgress, renderProgressBar, writeProgress } from "./progress"
+import { scanRoot, type ScanOptions, type ScanRootError } from "./scan"
+import { inspectPath, type StatusError, type WorktreeStatus } from "./status"
+import { isInspectableLinkedWorktree } from "./worktreePorcelain"
+
+export interface CandidateCounts {
+  readonly deletable: number
+  readonly oldEnoughBlocked: {
+    readonly total: number
+    readonly reasons: Readonly<Record<DeletionReason, number>>
+  }
+}
 
 export interface CandidateResult {
   readonly root: string
   readonly minimumAgeDays: number
+  readonly counts: CandidateCounts
   readonly candidates: ReadonlyArray<DeletionCandidate>
 }
 
 export type CandidateError = ScanRootError | StatusError
 
+export interface CandidateCollectionOptions extends CandidateSelectionOptions, ScanOptions {
+  readonly inspectConcurrency?: number
+}
+
+const defaultInspectConcurrency = 128
+
+const summarizeCandidateCounts = (
+  input: {
+    readonly statuses: ReadonlyArray<WorktreeStatus>
+    readonly candidates: ReadonlyArray<DeletionCandidate>
+  },
+  options: Required<Pick<CandidateSelectionOptions, "minimumAgeDays" | "now">>
+): CandidateCounts => {
+  const counts = {
+    deletable: input.candidates.length,
+    oldEnoughBlocked: {
+      total: 0,
+      reasons: {
+        dirty: 0,
+        missing_upstream: 0,
+        untracked: 0,
+        unpushed: 0
+      }
+    }
+  }
+
+  for (const status of input.statuses) {
+    const ageDays = calculateAgeDays(status.lastCommitAt, options.now)
+    const decision = evaluateDeletion(status)
+
+    if (ageDays <= options.minimumAgeDays || decision.deletable) {
+      continue
+    }
+
+    counts.oldEnoughBlocked.total += 1
+
+    for (const reason of decision.reasons) {
+      counts.oldEnoughBlocked.reasons[reason] += 1
+    }
+  }
+
+  return counts
+}
+
 export const collectCandidates = (
   root: string,
-  options: CandidateSelectionOptions = {}
+  options: CandidateCollectionOptions = {}
 ): Effect.Effect<CandidateResult, CandidateError> => {
   const minimumAgeDays = options.minimumAgeDays ?? 30
+  const now = options.now ?? new Date()
+  const progress = options.progress ?? false
 
-  return scanRoot(root).pipe(
-    Stream.flatMap((repository) => Stream.fromIterable(repository.worktrees)),
-    Stream.mapEffect((worktree) => inspectPath(worktree.path)),
+  return scanRoot(root, options).pipe(
     Stream.runCollect,
-    Effect.map((statuses) =>
-      selectDeletionCandidates(statuses, {
-        ...options,
-        minimumAgeDays
+    Effect.flatMap((repositories) =>
+      Effect.gen(function* () {
+        const repositoryList = Array.from(repositories)
+        const inspectableWorktrees = repositoryList.flatMap((repository) =>
+          repository.worktrees.filter((worktree) =>
+            isInspectableLinkedWorktree(repository.path, worktree)
+          )
+        )
+        const inspected = yield* Ref.make(0)
+        const total = inspectableWorktrees.length
+        yield* writeProgress(
+          progress,
+          renderProgressBar("inspecting worktrees", 0, total, "worktrees")
+        )
+        const statuses = yield* Effect.forEach(
+          inspectableWorktrees,
+          (worktree) =>
+            inspectPath(worktree.path).pipe(
+              Effect.tap(() =>
+                Ref.updateAndGet(inspected, (count) => count + 1).pipe(
+                  Effect.flatMap((count) =>
+                    writeProgress(
+                      progress,
+                      renderProgressBar("inspecting worktrees", count, total, "worktrees")
+                    )
+                  )
+                )
+              )
+            ),
+          { concurrency: options.inspectConcurrency ?? defaultInspectConcurrency }
+        ).pipe(Effect.ensuring(clearProgress(progress)))
+        const candidates = selectDeletionCandidates(statuses, {
+          ...options,
+          minimumAgeDays,
+          now
+        })
+        const counts = summarizeCandidateCounts(
+          {
+            statuses,
+            candidates
+          },
+          {
+            minimumAgeDays,
+            now
+          }
+        )
+
+        return {
+          counts,
+          candidates
+        }
       })
     ),
-    Effect.map((candidates): CandidateResult => ({
+    Effect.map((result): CandidateResult => ({
       root,
       minimumAgeDays,
-      candidates
+      counts: result.counts,
+      candidates: result.candidates
     }))
   )
 }
