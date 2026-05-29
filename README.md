@@ -26,11 +26,14 @@ Scan the directory that contains your normal project checkouts:
 npx treezap scan ~/code
 ```
 
-Preview linked worktrees eligible for deletion:
+Evaluate linked worktrees older than the minimum age:
 
 ```sh
 npx treezap candidates ~/code --min-age 30d
 ```
+
+The JSON includes `candidates` for worktrees that pass every safety check and
+`blockedCandidates` for old worktrees that need review before deletion.
 
 Print a compact count summary:
 

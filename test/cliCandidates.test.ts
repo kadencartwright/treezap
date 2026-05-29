@@ -21,6 +21,7 @@ const git = (
   })
 
 const seedCandidateFixture = (t: test.TestContext): {
+  readonly dirtyWorktree: string
   readonly root: string
   readonly oldWorktree: string
 } => {
@@ -60,13 +61,14 @@ const seedCandidateFixture = (t: test.TestContext): {
   rmSync(missingWorktree, { recursive: true, force: true })
 
   return {
+    dirtyWorktree,
     root,
     oldWorktree
   }
 }
 
-test("candidates command prints safe worktrees older than the minimum age", (t) => {
-  const { oldWorktree, root } = seedCandidateFixture(t)
+test("candidates command prints safe and safety-blocked worktrees older than the minimum age", (t) => {
+  const { dirtyWorktree, oldWorktree, root } = seedCandidateFixture(t)
 
   const output = execFileSync(
     process.execPath,
@@ -85,6 +87,15 @@ test("candidates command prints safe worktrees older than the minimum age", (t) 
     [oldWorktree]
   )
   assert.equal(parsed.candidates[0].decision.deletable, true)
+  assert.deepEqual(
+    parsed.blockedCandidates.map((candidate: { path: string }) => candidate.path),
+    [dirtyWorktree]
+  )
+  assert.deepEqual(parsed.blockedCandidates[0].decision, {
+    deletable: false,
+    reasons: ["dirty"]
+  })
+  assert.equal(parsed.blockedCandidates[0].status.dirty, true)
 })
 
 test("candidates command can print only the count summary", (t) => {

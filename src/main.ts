@@ -99,7 +99,7 @@ const candidates = Command.make(
       yield* Console.log(JSON.stringify(result, null, 2))
     })
 ).pipe(
-  Command.withDescription("List deletable worktrees.")
+  Command.withDescription("List aged worktrees with deletion safety facts.")
 )
 
 const rm = Command.make(
@@ -157,7 +157,7 @@ const commandHelp = {
   ].join("\n"),
   candidates: [
     "treezap candidates",
-    "List deletable worktrees.",
+    "List aged worktrees with deletion safety facts.",
     "",
     "Usage:",
     "  treezap candidates <root> [--min-age duration] [--count]",
@@ -192,7 +192,7 @@ const commandHelp = {
 } as const
 
 const rootHelp = [
-  "treezap 0.1.0",
+  "treezap 0.1.1",
   "Git worktree cleanup primitives.",
   "",
   "Usage:",
@@ -201,7 +201,7 @@ const rootHelp = [
   "Commands:",
   "  scan <root>                             List repos and worktrees.",
   "  stat <path>                             Inspect one path.",
-  "  candidates <root> [--min-age duration] [--count]  List deletable worktrees.",
+  "  candidates <root> [--min-age duration] [--count]  List aged worktrees with deletion safety facts.",
   "  rm <path> [--min-age duration]          Delete one eligible worktree.",
   "  rm-old <root> [--min-age duration]      Delete eligible linked worktrees.",
   "",
@@ -214,6 +214,11 @@ const rootHelp = [
 ].join("\n")
 
 const printHelpIfRequested = (args: ReadonlyArray<string>): boolean => {
+  if (args.length === 0) {
+    console.log(rootHelp)
+    return true
+  }
+
   if (!args.includes("--help") && !args.includes("-h")) {
     return false
   }
@@ -223,14 +228,14 @@ const printHelpIfRequested = (args: ReadonlyArray<string>): boolean => {
   return true
 }
 
-const command = Command.make("treezap", {}, () => Console.log("Run `treezap --help`.")).pipe(
+const command = Command.make("treezap", {}, () => Console.log(rootHelp)).pipe(
   Command.withDescription("Git worktree cleanup primitives."),
   Command.withSubcommands([scan, stat, candidates, rm, rmOld])
 )
 
 const cli = Command.run(command, {
   name: "treezap",
-  version: "0.1.0"
+  version: "0.1.1"
 })
 
 if (!printHelpIfRequested(process.argv.slice(2))) {

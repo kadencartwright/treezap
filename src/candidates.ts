@@ -6,6 +6,7 @@ import {
   selectDeletionCandidates,
   type CandidateSelectionOptions,
   type DeletionCandidate,
+  type DeletionDecision,
   type DeletionReason
 } from "./deletable"
 import { clearProgress, renderProgressBar, writeProgress } from "./progress"
@@ -21,11 +22,19 @@ export interface CandidateCounts {
   }
 }
 
+export interface CandidateEvaluation {
+  readonly path: string
+  readonly ageDays: number
+  readonly status: WorktreeStatus
+  readonly decision: DeletionDecision
+}
+
 export interface CandidateResult {
   readonly root: string
   readonly minimumAgeDays: number
   readonly counts: CandidateCounts
   readonly candidates: ReadonlyArray<DeletionCandidate>
+  readonly blockedCandidates: ReadonlyArray<CandidateEvaluation>
 }
 
 export type CandidateError = ScanRootError | StatusError
@@ -38,15 +47,14 @@ const defaultInspectConcurrency = 128
 
 const summarizeCandidateCounts = (
   input: {
-    readonly statuses: ReadonlyArray<WorktreeStatus>
     readonly candidates: ReadonlyArray<DeletionCandidate>
+    readonly blockedCandidates: ReadonlyArray<CandidateEvaluation>
   },
-  options: Required<Pick<CandidateSelectionOptions, "minimumAgeDays" | "now">>
 ): CandidateCounts => {
   const counts = {
     deletable: input.candidates.length,
     oldEnoughBlocked: {
-      total: 0,
+      total: input.blockedCandidates.length,
       reasons: {
         dirty: 0,
         missing_upstream: 0,
@@ -56,7 +64,22 @@ const summarizeCandidateCounts = (
     }
   }
 
-  for (const status of input.statuses) {
+  for (const candidate of input.blockedCandidates) {
+    for (const reason of candidate.decision.reasons) {
+      counts.oldEnoughBlocked.reasons[reason] += 1
+    }
+  }
+
+  return counts
+}
+
+const selectSafetyBlockedCandidates = (
+  statuses: Iterable<WorktreeStatus>,
+  options: Required<Pick<CandidateSelectionOptions, "minimumAgeDays" | "now">>
+): ReadonlyArray<CandidateEvaluation> => {
+  const blockedCandidates: Array<CandidateEvaluation> = []
+
+  for (const status of statuses) {
     const ageDays = calculateAgeDays(status.lastCommitAt, options.now)
     const decision = evaluateDeletion(status)
 
@@ -64,14 +87,15 @@ const summarizeCandidateCounts = (
       continue
     }
 
-    counts.oldEnoughBlocked.total += 1
-
-    for (const reason of decision.reasons) {
-      counts.oldEnoughBlocked.reasons[reason] += 1
-    }
+    blockedCandidates.push({
+      path: status.path,
+      ageDays,
+      status,
+      decision
+    })
   }
 
-  return counts
+  return blockedCandidates
 }
 
 export const collectCandidates = (
@@ -120,20 +144,21 @@ export const collectCandidates = (
           minimumAgeDays,
           now
         })
+        const blockedCandidates = selectSafetyBlockedCandidates(statuses, {
+          minimumAgeDays,
+          now
+        })
         const counts = summarizeCandidateCounts(
           {
-            statuses,
-            candidates
-          },
-          {
-            minimumAgeDays,
-            now
+            candidates,
+            blockedCandidates
           }
         )
 
         return {
           counts,
-          candidates
+          candidates,
+          blockedCandidates
         }
       })
     ),
@@ -141,7 +166,8 @@ export const collectCandidates = (
       root,
       minimumAgeDays,
       counts: result.counts,
-      candidates: result.candidates
+      candidates: result.candidates,
+      blockedCandidates: result.blockedCandidates
     }))
   )
 }
