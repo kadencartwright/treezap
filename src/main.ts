@@ -4,7 +4,9 @@ import { Args, Command, Options } from "@effect/cli"
 import { NodeContext, NodeRuntime } from "@effect/platform-node"
 import { Console, Effect } from "effect"
 
+import { evaluateDeletion } from "./deletable"
 import { collectScanRoot } from "./scan"
+import { inspectPath } from "./status"
 
 const agentHelp = Options.boolean("agent-help").pipe(
   Options.withDescription("Print the concise command flow intended for agent harnesses.")
@@ -39,17 +41,11 @@ const stat = Command.make(
   "stat",
   { path: pathArg },
   ({ path }) =>
-    Console.log(
-      JSON.stringify(
-        {
-          command: "stat",
-          path,
-          status: "not_implemented"
-        },
-        null,
-        2
-      )
-    )
+    Effect.gen(function* () {
+      const status = yield* inspectPath(path)
+      const decision = evaluateDeletion(status)
+      yield* Console.log(JSON.stringify({ ...status, ...decision }, null, 2))
+    })
 ).pipe(
   Command.withDescription("Report deletion safety facts for one repository or worktree.")
 )
