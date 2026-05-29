@@ -32,6 +32,17 @@ const applyRecordLine = (draft: WorktreePorcelainEntryDraft, line: string) => {
 
   if (line === "detached") {
     draft.detached = true
+    return
+  }
+
+  if (line === "locked") {
+    draft.locked = true
+    return
+  }
+
+  if (line.startsWith("locked ")) {
+    draft.locked = true
+    draft.lockReason = line.slice("locked ".length)
   }
 }
 
