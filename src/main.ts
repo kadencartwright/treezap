@@ -16,21 +16,18 @@ import { evaluateRemove } from "./remove"
 import { collectScanRoot } from "./scan"
 import { inspectPath } from "./status"
 
-const agentHelp = Options.boolean("agent-help").pipe(
-  Options.withDescription("Print the concise command flow intended for agent harnesses.")
-)
-
 const minAge = Options.text("min-age").pipe(
+  Options.withPseudoName("duration"),
   Options.withDefault("30d"),
-  Options.withDescription("Minimum age threshold for deletion eligibility. Supports days only, e.g. 30d.")
+  Options.withDescription("Minimum age. Examples: 30d, 2w, 1m, 1y.")
 )
 
 const rootArg = Args.text({ name: "root" }).pipe(
-  Args.withDescription("Root directory that contains primary project checkouts.")
+  Args.withDescription("Project root.")
 )
 
 const pathArg = Args.text({ name: "path" }).pipe(
-  Args.withDescription("Repository or worktree path.")
+  Args.withDescription("Repo or worktree path.")
 )
 
 const parseMinimumAgeDays = (input: string): Effect.Effect<number, DurationParseError> => {
@@ -52,7 +49,7 @@ const scan = Command.make(
       yield* Console.log(JSON.stringify(result, null, 2))
     })
 ).pipe(
-  Command.withDescription("Discover Git repositories under a root and list their worktrees.")
+  Command.withDescription("List repos and worktrees.")
 )
 
 const stat = Command.make(
@@ -65,7 +62,7 @@ const stat = Command.make(
       yield* Console.log(JSON.stringify({ ...status, ...decision }, null, 2))
     })
 ).pipe(
-  Command.withDescription("Report deletion safety facts for one repository or worktree.")
+  Command.withDescription("Inspect one path.")
 )
 
 const candidates = Command.make(
@@ -81,7 +78,7 @@ const candidates = Command.make(
       yield* Console.log(JSON.stringify(result, null, 2))
     })
 ).pipe(
-  Command.withDescription("Report safe worktrees older than the minimum age without deleting them.")
+  Command.withDescription("List deletable worktrees.")
 )
 
 const rm = Command.make(
@@ -97,7 +94,7 @@ const rm = Command.make(
       yield* Console.log(JSON.stringify(result, null, 2))
     })
 ).pipe(
-  Command.withDescription("Delete one stale repository or worktree after safety checks.")
+  Command.withDescription("Delete one eligible worktree.")
 )
 
 const rmOld = Command.make(
@@ -113,29 +110,11 @@ const rmOld = Command.make(
       yield* Console.log(JSON.stringify(result, null, 2))
     })
 ).pipe(
-  Command.withDescription("Bulk delete stale repositories or worktrees discovered under a root.")
+  Command.withDescription("Delete eligible linked worktrees.")
 )
 
-const agentHelpBanner = [
-  "worktree-sentinel exposes raw primitives only.",
-  "",
-  "Suggested flow:",
-  "  sentinel scan <root>",
-  "  sentinel stat <path>",
-  "  sentinel candidates <root> [--min-age 30d]",
-  "  sentinel rm <path> [--min-age 30d]",
-  "  sentinel rm-old <root> [--min-age 30d]",
-  "",
-  "Deletion commands will own all safety checks when implemented.",
-  "For now, commands only parse inputs and return not_implemented JSON."
-].join("\n")
-
-const command = Command.make("sentinel", { agentHelp }, ({ agentHelp }) =>
-  agentHelp
-    ? Console.log(agentHelpBanner)
-    : Console.log("Run `sentinel --help` for commands or `sentinel --agent-help` for the raw command flow.")
-).pipe(
-  Command.withDescription("Raw CLI primitives for discovering and deleting stale Git worktrees."),
+const command = Command.make("sentinel", {}, () => Console.log("Run `sentinel --help`.")).pipe(
+  Command.withDescription("Git worktree cleanup primitives."),
   Command.withSubcommands([scan, stat, candidates, rm, rmOld])
 )
 
