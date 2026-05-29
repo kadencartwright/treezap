@@ -3,6 +3,8 @@ export interface WorktreePorcelainEntry {
   readonly head?: string
   readonly branch?: string
   readonly detached: boolean
+  readonly locked: boolean
+  readonly lockReason?: string
 }
 
 type Mutable<T> = {
@@ -11,6 +13,7 @@ type Mutable<T> = {
 
 type WorktreePorcelainEntryDraft = Partial<Mutable<WorktreePorcelainEntry>> & {
   detached: boolean
+  locked: boolean
 }
 
 const branchNameFromRef = (ref: string): string =>
@@ -42,7 +45,8 @@ const parseRecord = (record: string): WorktreePorcelainEntry | undefined => {
 
   const draft: WorktreePorcelainEntryDraft = {
     path: firstLine.slice("worktree ".length),
-    detached: false
+    detached: false,
+    locked: false
   }
 
   for (const line of remainingLines) {
@@ -57,7 +61,9 @@ const parseRecord = (record: string): WorktreePorcelainEntry | undefined => {
     path: draft.path,
     head: draft.head,
     branch: draft.branch,
-    detached: draft.detached
+    detached: draft.detached,
+    locked: draft.locked,
+    lockReason: draft.lockReason
   }
 }
 

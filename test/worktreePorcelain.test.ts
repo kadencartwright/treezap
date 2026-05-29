@@ -52,3 +52,57 @@ test("parses real git porcelain for a repo with one linked worktree", (t) => {
   assert.equal(linked.branch, "feature/linked")
   assert.equal(linked.detached, false)
 })
+
+test("parses real git porcelain for a detached linked worktree", (t) => {
+  const root = mkdtempSync(join(tmpdir(), "worktree-sentinel-porcelain-"))
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+
+  const repo = join(root, "repo")
+  const detachedWorktree = join(root, "detached-worktree")
+
+  mkdirSync(repo)
+  git(repo, ["init", "--quiet", "--initial-branch", "main"])
+  git(repo, ["config", "user.email", "sentinel-test@example.test"])
+  git(repo, ["config", "user.name", "Sentinel Test"])
+
+  writeFileSync(join(repo, "README.md"), "# test repo\n")
+  git(repo, ["add", "README.md"])
+  git(repo, ["commit", "--quiet", "-m", "initial commit"])
+  git(repo, ["worktree", "add", "--quiet", "--detach", detachedWorktree, "HEAD"])
+
+  const parsed = parseWorktreePorcelain(git(repo, ["worktree", "list", "--porcelain"]))
+  const detached = new Map(parsed.map((entry) => [entry.path, entry])).get(detachedWorktree)
+
+  assert.ok(detached)
+  assert.match(detached.head ?? "", /^[0-9a-f]{40}$/)
+  assert.equal(detached.branch, undefined)
+  assert.equal(detached.detached, true)
+})
+
+test("parses real git porcelain for a locked linked worktree with a spaced path", (t) => {
+  const root = mkdtempSync(join(tmpdir(), "worktree-sentinel-porcelain-"))
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+
+  const repo = join(root, "repo")
+  const lockedWorktree = join(root, "locked worktree")
+
+  mkdirSync(repo)
+  git(repo, ["init", "--quiet", "--initial-branch", "main"])
+  git(repo, ["config", "user.email", "sentinel-test@example.test"])
+  git(repo, ["config", "user.name", "Sentinel Test"])
+
+  writeFileSync(join(repo, "README.md"), "# test repo\n")
+  git(repo, ["add", "README.md"])
+  git(repo, ["commit", "--quiet", "-m", "initial commit"])
+  git(repo, ["worktree", "add", "--quiet", "-b", "feature/locked", lockedWorktree, "HEAD"])
+  git(repo, ["worktree", "lock", "--reason", "active agent run", lockedWorktree])
+
+  const parsed = parseWorktreePorcelain(git(repo, ["worktree", "list", "--porcelain"]))
+  const locked = new Map(parsed.map((entry) => [entry.path, entry])).get(lockedWorktree)
+
+  assert.ok(locked)
+  assert.equal(locked.branch, "feature/locked")
+  assert.equal(locked.detached, false)
+  assert.equal(locked.locked, true)
+  assert.equal(locked.lockReason, "active agent run")
+})
