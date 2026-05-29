@@ -4,7 +4,9 @@ import { Args, Command, Options } from "@effect/cli"
 import { NodeContext, NodeRuntime } from "@effect/platform-node"
 import { Console, Effect } from "effect"
 
+import { collectCandidates } from "./candidates"
 import { evaluateDeletion } from "./deletable"
+import { isDurationParseError, parseMinAgeDays } from "./duration"
 import { collectScanRoot } from "./scan"
 import { inspectPath } from "./status"
 
@@ -48,6 +50,27 @@ const stat = Command.make(
     })
 ).pipe(
   Command.withDescription("Report deletion safety facts for one repository or worktree.")
+)
+
+const candidates = Command.make(
+  "candidates",
+  {
+    root: rootArg,
+    minAge
+  },
+  ({ minAge, root }) =>
+    Effect.gen(function* () {
+      const minimumAgeDays = parseMinAgeDays(minAge)
+
+      if (isDurationParseError(minimumAgeDays)) {
+        return yield* Effect.fail(minimumAgeDays)
+      }
+
+      const result = yield* collectCandidates(root, { minimumAgeDays })
+      yield* Console.log(JSON.stringify(result, null, 2))
+    })
+).pipe(
+  Command.withDescription("Report safe worktrees older than the minimum age without deleting them.")
 )
 
 const rm = Command.make(
@@ -102,6 +125,7 @@ const agentHelpBanner = [
   "Suggested flow:",
   "  sentinel scan <root>",
   "  sentinel stat <path>",
+  "  sentinel candidates <root> [--min-age 30d]",
   "  sentinel rm <path> [--min-age 30d]",
   "  sentinel rm-old <root> [--min-age 30d]",
   "",
@@ -115,7 +139,7 @@ const command = Command.make("sentinel", { agentHelp }, ({ agentHelp }) =>
     : Console.log("Run `sentinel --help` for commands or `sentinel --agent-help` for the raw command flow.")
 ).pipe(
   Command.withDescription("Raw CLI primitives for discovering and deleting stale Git worktrees."),
-  Command.withSubcommands([scan, stat, rm, rmOld])
+  Command.withSubcommands([scan, stat, candidates, rm, rmOld])
 )
 
 const cli = Command.run(command, {
