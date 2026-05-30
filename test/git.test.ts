@@ -6,7 +6,13 @@ import test from "node:test"
 
 import { Effect } from "effect"
 
-import { runGit } from "../src/git"
+import {
+  GitCommandError,
+  classifyRemoveWorktreeError,
+  parseDivergence,
+  parseWorkingTreeChanges,
+  runGit
+} from "../src/git"
 
 test("runGit returns stdout and command metadata for successful git commands", async (t) => {
   const cwd = mkdtempSync(join(tmpdir(), "treezap-git-"))
@@ -35,4 +41,66 @@ test("runGit returns typed command errors with stderr and exit code", async (t) 
   assert.equal(error.stdout, "")
   assert.match(error.stderr, /not a git repository/)
   assert.equal(error.exitCode, 128)
+})
+
+test("parses working tree porcelain into dirty and untracked facts", () => {
+  assert.deepEqual(parseWorkingTreeChanges(""), {
+    dirty: false,
+    untracked: false,
+    porcelain: ""
+  })
+
+  assert.deepEqual(parseWorkingTreeChanges(" M README.md\n?? scratch.txt\n"), {
+    dirty: true,
+    untracked: true,
+    porcelain: " M README.md\n?? scratch.txt\n"
+  })
+
+  assert.deepEqual(parseWorkingTreeChanges("?? scratch.txt\n"), {
+    dirty: false,
+    untracked: true,
+    porcelain: "?? scratch.txt\n"
+  })
+})
+
+test("parses upstream divergence counts", () => {
+  assert.deepEqual(parseDivergence("3\t2\n"), {
+    ahead: 3,
+    behind: 2
+  })
+})
+
+test("classifies expected worktree removal failures", () => {
+  const commandError = (stderr: string): GitCommandError =>
+    new GitCommandError({
+      cwd: "/repo",
+      args: ["worktree", "remove", "/worktree"],
+      stdout: "",
+      stderr,
+      exitCode: 128,
+      cause: {}
+    })
+
+  assert.equal(
+    classifyRemoveWorktreeError(
+      "/worktree",
+      commandError("fatal: working trees containing submodules cannot be moved or removed\n")
+    )?.reason,
+    "contains_submodules"
+  )
+  assert.equal(
+    classifyRemoveWorktreeError(
+      "/worktree",
+      commandError("fatal: cannot remove a locked working tree;\n")
+    )?.reason,
+    "locked_worktree"
+  )
+  assert.equal(
+    classifyRemoveWorktreeError(
+      "/worktree",
+      commandError("fatal: '/worktree' contains modified or untracked files, use --force\n")
+    )?.reason,
+    "dirty_worktree"
+  )
+  assert.equal(classifyRemoveWorktreeError("/worktree", commandError("fatal: unknown\n")), undefined)
 })

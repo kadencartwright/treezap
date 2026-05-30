@@ -1,9 +1,9 @@
 import { Effect, Ref, Stream } from "effect"
 
+import { listWorktrees, type GitCommandError } from "./git"
 import { clearProgress, renderProgressBar, writeProgress } from "./progress"
 import { discoverRepos, type DiscoverReposError } from "./repos"
 import type { WorktreePorcelainEntry } from "./worktreePorcelain"
-import { listWorktrees, type WorktreeListError } from "./worktrees"
 
 export interface ScannedRepository {
   readonly path: string
@@ -20,7 +20,7 @@ export interface ScanOptions {
   readonly concurrency?: number
 }
 
-export type ScanRootError = DiscoverReposError | WorktreeListError
+export type ScanRootError = DiscoverReposError | GitCommandError
 
 const defaultConcurrency = 128
 

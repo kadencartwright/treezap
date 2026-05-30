@@ -5,7 +5,7 @@ import {
   evaluateDeletion,
   type DeletionDecision
 } from "./deletable"
-import { runGit } from "./git"
+import { removeWorktree, type GitRemoveWorktreeError } from "./git"
 import { inspectPath, type StatusError, type WorktreeStatus } from "./status"
 
 export interface RemoveEvaluationOptions {
@@ -25,13 +25,15 @@ export interface RemoveEvaluationResult {
 
 const defaultMinimumAgeDays = 30
 
-const isSubmoduleWorktreeRemoveError = (error: StatusError): boolean =>
-  error.stderr.includes("working trees containing submodules cannot be moved or removed")
+type RemovePathError = StatusError | GitRemoveWorktreeError
+
+const isSubmoduleWorktreeRemoveError = (error: RemovePathError): boolean =>
+  error._tag === "GitRemoveWorktreeError" && error.reason === "contains_submodules"
 
 export const removePath = (
   path: string,
   options: RemoveEvaluationOptions = {}
-): Effect.Effect<RemoveEvaluationResult, StatusError> => {
+): Effect.Effect<RemoveEvaluationResult, RemovePathError> => {
   const now = options.now ?? new Date()
   const minimumAgeDays = options.minimumAgeDays ?? defaultMinimumAgeDays
 
@@ -51,7 +53,7 @@ export const removePath = (
     }
 
     let deletionEvaluation = revalidatedEvaluation
-    const removeResult = yield* runGit(path, ["worktree", "remove", path]).pipe(Effect.either)
+    const removeResult = yield* removeWorktree(path).pipe(Effect.either)
 
     if (Either.isLeft(removeResult)) {
       if (!isSubmoduleWorktreeRemoveError(removeResult.left)) {
@@ -70,7 +72,7 @@ export const removePath = (
       }
 
       deletionEvaluation = submoduleRevalidatedEvaluation
-      yield* runGit(path, ["worktree", "remove", "--force", path])
+      yield* removeWorktree(path, { force: true })
     }
 
     return {

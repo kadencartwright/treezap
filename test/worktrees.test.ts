@@ -7,7 +7,7 @@ import test from "node:test"
 
 import { Effect } from "effect"
 
-import { listWorktrees } from "../src/worktrees"
+import { listWorktrees } from "../src/git"
 
 const git = (cwd: string, args: ReadonlyArray<string>): string =>
   execFileSync("git", args, {
