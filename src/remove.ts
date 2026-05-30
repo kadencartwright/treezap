@@ -1,4 +1,4 @@
-import { Effect } from "effect"
+import { Effect, Either } from "effect"
 
 import {
   calculateAgeDays,
@@ -25,6 +25,9 @@ export interface RemoveEvaluationResult {
 
 const defaultMinimumAgeDays = 30
 
+const isSubmoduleWorktreeRemoveError = (error: StatusError): boolean =>
+  error.stderr.includes("working trees containing submodules cannot be moved or removed")
+
 export const removePath = (
   path: string,
   options: RemoveEvaluationOptions = {}
@@ -47,10 +50,31 @@ export const removePath = (
       return revalidatedEvaluation
     }
 
-    yield* runGit(path, ["worktree", "remove", path])
+    let deletionEvaluation = revalidatedEvaluation
+    const removeResult = yield* runGit(path, ["worktree", "remove", path]).pipe(Effect.either)
+
+    if (Either.isLeft(removeResult)) {
+      if (!isSubmoduleWorktreeRemoveError(removeResult.left)) {
+        return yield* Effect.fail(removeResult.left)
+      }
+
+      const submoduleRevalidated = yield* inspectPath(path)
+      const submoduleRevalidatedEvaluation = evaluateStatus(
+        submoduleRevalidated,
+        now,
+        minimumAgeDays
+      )
+
+      if (!submoduleRevalidatedEvaluation.eligible) {
+        return submoduleRevalidatedEvaluation
+      }
+
+      deletionEvaluation = submoduleRevalidatedEvaluation
+      yield* runGit(path, ["worktree", "remove", "--force", path])
+    }
 
     return {
-      ...revalidatedEvaluation,
+      ...deletionEvaluation,
       deleted: true
     }
   })

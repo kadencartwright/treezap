@@ -192,7 +192,7 @@ const commandHelp = {
 } as const
 
 const rootHelp = [
-  "treezap 0.1.1",
+  "treezap 0.1.3",
   "Git worktree cleanup primitives.",
   "",
   "Usage:",
@@ -235,7 +235,7 @@ const command = Command.make("treezap", {}, () => Console.log(rootHelp)).pipe(
 
 const cli = Command.run(command, {
   name: "treezap",
-  version: "0.1.1"
+  version: "0.1.3"
 })
 
 if (!printHelpIfRequested(process.argv.slice(2))) {

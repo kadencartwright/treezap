@@ -1,6 +1,6 @@
 {
 	"name": "treezap",
-	"version": "0.1.2",
+	"version": "0.1.3",
 	"description": "CLI primitives for discovering and deleting stale Git worktrees.",
 	"type": "module",
 	"homepage": "https://github.com/kadencartwright/treezap#readme",

@@ -25,6 +25,70 @@ const setDefaultRemoteBranch = (root: string, remote: string, repo: string): voi
   git(repo, ["remote", "set-head", "origin", "-a"])
 }
 
+const createSubmoduleRemote = (root: string): string => {
+  const remote = join(root, "submodule.git")
+  const checkout = join(root, "submodule-source")
+
+  git(root, ["init", "--quiet", "--bare", remote])
+  git(root, ["clone", "--quiet", remote, checkout])
+  git(checkout, ["switch", "--quiet", "-c", "main"])
+  git(checkout, ["config", "user.email", "treezap-test@example.test"])
+  git(checkout, ["config", "user.name", "Sentinel Test"])
+  writeFileSync(join(checkout, "README.md"), "# test submodule\n")
+  git(checkout, ["add", "README.md"])
+  git(checkout, ["commit", "--quiet", "-m", "initial submodule commit"])
+  git(checkout, ["push", "--quiet", "--set-upstream", "origin", "main"])
+  git(root, ["--git-dir", remote, "symbolic-ref", "HEAD", "refs/heads/main"])
+
+  return remote
+}
+
+const createLinkedWorktreeWithSubmodule = (
+  root: string,
+  oldDate: Date,
+  branchName: string,
+  linkedWorktree: string
+): string => {
+  const remote = join(root, "remote.git")
+  const repo = join(root, "repo")
+  const submoduleRemote = createSubmoduleRemote(root)
+
+  git(root, ["init", "--quiet", "--bare", remote])
+  git(root, ["clone", "--quiet", remote, repo])
+  git(repo, ["switch", "--quiet", "-c", "main"])
+  git(repo, ["config", "user.email", "treezap-test@example.test"])
+  git(repo, ["config", "user.name", "Sentinel Test"])
+
+  writeFileSync(join(repo, "README.md"), "# test repo\n")
+  git(repo, ["add", "README.md"])
+  git(repo, ["commit", "--quiet", "-m", "old commit"], { date: oldDate })
+  git(repo, [
+    "-c",
+    "protocol.file.allow=always",
+    "submodule",
+    "add",
+    "--quiet",
+    submoduleRemote,
+    "deps/submodule"
+  ])
+  git(repo, ["commit", "--quiet", "-am", "add submodule"], { date: oldDate })
+  git(repo, ["push", "--quiet", "--set-upstream", "origin", "main"])
+  setDefaultRemoteBranch(root, remote, repo)
+  git(repo, ["branch", branchName])
+  git(repo, ["push", "--quiet", "--set-upstream", "origin", branchName])
+  git(repo, ["worktree", "add", "--quiet", linkedWorktree, branchName])
+  git(linkedWorktree, [
+    "-c",
+    "protocol.file.allow=always",
+    "submodule",
+    "update",
+    "--init",
+    "--quiet"
+  ])
+
+  return repo
+}
+
 test("rm command deletes an eligible linked worktree", (t) => {
   const root = mkdtempSync(join(tmpdir(), "treezap-cli-rm-"))
   t.after(() => rmSync(root, { recursive: true, force: true }))
@@ -73,6 +137,38 @@ test("rm command deletes an eligible linked worktree", (t) => {
   assert.equal(existsSync(repo), true)
 })
 
+test("rm command deletes an eligible linked worktree with an initialized submodule", (t) => {
+  const root = mkdtempSync(join(tmpdir(), "treezap-cli-rm-"))
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+
+  const oldDate = new Date(Date.now() - 45 * 24 * 60 * 60 * 1000)
+  const linkedWorktree = join(root, "linked-worktree")
+  const repo = createLinkedWorktreeWithSubmodule(
+    root,
+    oldDate,
+    "feature/delete-submodule-worktree",
+    linkedWorktree
+  )
+
+  const output = execFileSync(
+    process.execPath,
+    ["--import", "tsx", "src/main.ts", "rm", linkedWorktree, "--min-age", "30d"],
+    {
+      cwd: process.cwd(),
+      encoding: "utf8"
+    }
+  )
+  const parsed = JSON.parse(output)
+
+  assert.equal(parsed.deleted, true)
+  assert.deepEqual(parsed.decision, {
+    deletable: true,
+    reasons: []
+  })
+  assert.equal(existsSync(linkedWorktree), false)
+  assert.equal(existsSync(repo), true)
+})
+
 test("rm command does not delete an unsafe linked worktree", (t) => {
   const root = mkdtempSync(join(tmpdir(), "treezap-cli-rm-"))
   t.after(() => rmSync(root, { recursive: true, force: true }))
@@ -110,6 +206,37 @@ test("rm command does not delete an unsafe linked worktree", (t) => {
   const parsed = JSON.parse(output)
 
   assert.equal(parsed.path, linkedWorktree)
+  assert.equal(parsed.deleted, false)
+  assert.equal(parsed.eligible, false)
+  assert.deepEqual(parsed.decision.reasons, ["dirty"])
+  assert.equal(existsSync(linkedWorktree), true)
+})
+
+test("rm command does not delete a linked worktree with dirty submodule work", (t) => {
+  const root = mkdtempSync(join(tmpdir(), "treezap-cli-rm-"))
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+
+  const oldDate = new Date(Date.now() - 45 * 24 * 60 * 60 * 1000)
+  const linkedWorktree = join(root, "linked-worktree")
+  createLinkedWorktreeWithSubmodule(
+    root,
+    oldDate,
+    "feature/keep-dirty-submodule-worktree",
+    linkedWorktree
+  )
+
+  writeFileSync(join(linkedWorktree, "deps", "submodule", "scratch.txt"), "scratch\n")
+
+  const output = execFileSync(
+    process.execPath,
+    ["--import", "tsx", "src/main.ts", "rm", linkedWorktree, "--min-age", "30d"],
+    {
+      cwd: process.cwd(),
+      encoding: "utf8"
+    }
+  )
+  const parsed = JSON.parse(output)
+
   assert.equal(parsed.deleted, false)
   assert.equal(parsed.eligible, false)
   assert.deepEqual(parsed.decision.reasons, ["dirty"])
