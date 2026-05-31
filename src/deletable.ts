@@ -1,78 +1,78 @@
-import type { WorktreeStatus } from "./status"
+import type { WorktreeStatus } from "./status";
 
 export type DeletionReason =
   | "dirty"
   | "missing_default_branch"
   | "untracked"
-  | "unique_patches"
+  | "unique_patches";
 
 export interface DeletionDecision {
-  readonly deletable: boolean
-  readonly reasons: ReadonlyArray<DeletionReason>
+  readonly deletable: boolean;
+  readonly reasons: ReadonlyArray<DeletionReason>;
 }
 
 export interface DeletionCandidate {
-  readonly path: string
-  readonly ageDays: number
-  readonly status: WorktreeStatus
-  readonly decision: DeletionDecision
+  readonly path: string;
+  readonly ageDays: number;
+  readonly status: WorktreeStatus;
+  readonly decision: DeletionDecision;
 }
 
 export interface CandidateSelectionOptions {
-  readonly now?: Date
-  readonly minimumAgeDays?: number
+  readonly now?: Date;
+  readonly minimumAgeDays?: number;
 }
 
-const millisecondsPerDay = 24 * 60 * 60 * 1000
-const defaultMinimumAgeDays = 30
+const millisecondsPerDay = 24 * 60 * 60 * 1000;
+const defaultMinimumAgeDays = 30;
 
 export const evaluateDeletion = (status: WorktreeStatus): DeletionDecision => {
-  const reasons: Array<DeletionReason> = []
+  const reasons: Array<DeletionReason> = [];
 
   if (status.dirty) {
-    reasons.push("dirty")
+    reasons.push("dirty");
   }
 
   if (status.untracked) {
-    reasons.push("untracked")
+    reasons.push("untracked");
   }
 
   if (status.committedWork === undefined) {
-    reasons.push("missing_default_branch")
+    reasons.push("missing_default_branch");
   } else if (status.committedWork.uniquePatchCount > 0) {
-    reasons.push("unique_patches")
+    reasons.push("unique_patches");
   }
 
   return {
     deletable: reasons.length === 0,
-    reasons
-  }
-}
+    reasons,
+  };
+};
 
 export const selectDeletionCandidates = (
   statuses: Iterable<WorktreeStatus>,
-  options: CandidateSelectionOptions = {}
+  options: CandidateSelectionOptions = {},
 ): ReadonlyArray<DeletionCandidate> => {
-  const now = options.now ?? new Date()
-  const minimumAgeDays = options.minimumAgeDays ?? defaultMinimumAgeDays
-  const candidates: Array<DeletionCandidate> = []
+  const now = options.now ?? new Date();
+  const minimumAgeDays = options.minimumAgeDays ?? defaultMinimumAgeDays;
+  const candidates: Array<DeletionCandidate> = [];
 
   for (const status of statuses) {
-    const decision = evaluateDeletion(status)
-    const ageDays = calculateAgeDays(status.lastCommitAt, now)
+    const decision = evaluateDeletion(status);
+    const ageDays = calculateAgeDays(status.lastCommitAt, now);
 
     if (decision.deletable && ageDays > minimumAgeDays) {
       candidates.push({
         path: status.path,
         ageDays,
         status,
-        decision
-      })
+        decision,
+      });
     }
   }
 
-  return candidates
-}
+  return candidates;
+};
 
 export const calculateAgeDays = (date: string, now: Date): number =>
-  Math.floor((now.getTime() - new Date(date).getTime()) / millisecondsPerDay)
+  Math.floor((now.getTime() - new Date(date).getTime()) / millisecondsPerDay);

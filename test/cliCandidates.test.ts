@@ -1,14 +1,14 @@
-import assert from "node:assert/strict"
-import { execFileSync, spawnSync } from "node:child_process"
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
-import { tmpdir } from "node:os"
-import { join } from "node:path"
-import test from "node:test"
+import assert from "node:assert/strict";
+import { execFileSync, spawnSync } from "node:child_process";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import test from "node:test";
 
 const git = (
   cwd: string,
   args: ReadonlyArray<string>,
-  options: { readonly date?: Date } = {}
+  options: { readonly date?: Date } = {},
 ): string =>
   execFileSync("git", args, {
     cwd,
@@ -16,127 +16,147 @@ const git = (
     env: {
       ...process.env,
       GIT_AUTHOR_DATE: options.date?.toISOString(),
-      GIT_COMMITTER_DATE: options.date?.toISOString()
-    }
-  })
+      GIT_COMMITTER_DATE: options.date?.toISOString(),
+    },
+  });
 
-const setDefaultRemoteBranch = (root: string, remote: string, repo: string): void => {
-  git(root, ["--git-dir", remote, "symbolic-ref", "HEAD", "refs/heads/main"])
-  git(repo, ["remote", "set-head", "origin", "-a"])
-}
+const setDefaultRemoteBranch = (
+  root: string,
+  remote: string,
+  repo: string,
+): void => {
+  git(root, ["--git-dir", remote, "symbolic-ref", "HEAD", "refs/heads/main"]);
+  git(repo, ["remote", "set-head", "origin", "-a"]);
+};
 
-const seedCandidateFixture = (t: test.TestContext): {
-  readonly dirtyWorktree: string
-  readonly root: string
-  readonly oldWorktree: string
-  readonly uniqueWorktree: string
+const seedCandidateFixture = (
+  t: test.TestContext,
+): {
+  readonly dirtyWorktree: string;
+  readonly root: string;
+  readonly oldWorktree: string;
+  readonly uniqueWorktree: string;
 } => {
-  const root = mkdtempSync(join(tmpdir(), "treezap-cli-candidates-"))
-  t.after(() => rmSync(root, { recursive: true, force: true }))
+  const root = mkdtempSync(join(tmpdir(), "treezap-cli-candidates-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
 
-  const oldDate = new Date(Date.now() - 45 * 24 * 60 * 60 * 1000)
-  const remote = join(root, "remote.git")
-  const repo = join(root, "repo")
-  const oldWorktree = join(root, "old-worktree")
-  const dirtyWorktree = join(root, "dirty-worktree")
-  const uniqueWorktree = join(root, "unique-worktree")
-  const missingWorktree = join(root, "missing-worktree")
+  const oldDate = new Date(Date.now() - 45 * 24 * 60 * 60 * 1000);
+  const remote = join(root, "remote.git");
+  const repo = join(root, "repo");
+  const oldWorktree = join(root, "old-worktree");
+  const dirtyWorktree = join(root, "dirty-worktree");
+  const uniqueWorktree = join(root, "unique-worktree");
+  const missingWorktree = join(root, "missing-worktree");
 
-  git(root, ["init", "--quiet", "--bare", remote])
-  git(root, ["clone", "--quiet", remote, repo])
-  git(repo, ["switch", "--quiet", "-c", "main"])
-  git(repo, ["config", "user.email", "treezap-test@example.test"])
-  git(repo, ["config", "user.name", "Sentinel Test"])
+  git(root, ["init", "--quiet", "--bare", remote]);
+  git(root, ["clone", "--quiet", remote, repo]);
+  git(repo, ["switch", "--quiet", "-c", "main"]);
+  git(repo, ["config", "user.email", "treezap-test@example.test"]);
+  git(repo, ["config", "user.name", "Sentinel Test"]);
 
-  writeFileSync(join(repo, "README.md"), "# test repo\n")
-  git(repo, ["add", "README.md"])
-  git(repo, ["commit", "--quiet", "-m", "old commit"], { date: oldDate })
-  git(repo, ["push", "--quiet", "--set-upstream", "origin", "main"])
-  setDefaultRemoteBranch(root, remote, repo)
+  writeFileSync(join(repo, "README.md"), "# test repo\n");
+  git(repo, ["add", "README.md"]);
+  git(repo, ["commit", "--quiet", "-m", "old commit"], { date: oldDate });
+  git(repo, ["push", "--quiet", "--set-upstream", "origin", "main"]);
+  setDefaultRemoteBranch(root, remote, repo);
 
-  git(repo, ["branch", "feature/old"])
-  git(repo, ["push", "--quiet", "--set-upstream", "origin", "feature/old"])
-  git(repo, ["worktree", "add", "--quiet", oldWorktree, "feature/old"])
+  git(repo, ["branch", "feature/old"]);
+  git(repo, ["push", "--quiet", "--set-upstream", "origin", "feature/old"]);
+  git(repo, ["worktree", "add", "--quiet", oldWorktree, "feature/old"]);
 
-  git(repo, ["branch", "feature/dirty"])
-  git(repo, ["push", "--quiet", "--set-upstream", "origin", "feature/dirty"])
-  git(repo, ["worktree", "add", "--quiet", dirtyWorktree, "feature/dirty"])
-  writeFileSync(join(dirtyWorktree, "README.md"), "# dirty repo\n")
+  git(repo, ["branch", "feature/dirty"]);
+  git(repo, ["push", "--quiet", "--set-upstream", "origin", "feature/dirty"]);
+  git(repo, ["worktree", "add", "--quiet", dirtyWorktree, "feature/dirty"]);
+  writeFileSync(join(dirtyWorktree, "README.md"), "# dirty repo\n");
 
-  git(repo, ["switch", "--quiet", "main"])
-  git(repo, ["switch", "--quiet", "-c", "feature/unique"])
-  writeFileSync(join(repo, "unique.txt"), "unique patch\n")
-  git(repo, ["add", "unique.txt"])
-  git(repo, ["commit", "--quiet", "-m", "feature unique commit"], { date: oldDate })
-  git(repo, ["switch", "--quiet", "main"])
-  git(repo, ["worktree", "add", "--quiet", uniqueWorktree, "feature/unique"])
+  git(repo, ["switch", "--quiet", "main"]);
+  git(repo, ["switch", "--quiet", "-c", "feature/unique"]);
+  writeFileSync(join(repo, "unique.txt"), "unique patch\n");
+  git(repo, ["add", "unique.txt"]);
+  git(repo, ["commit", "--quiet", "-m", "feature unique commit"], {
+    date: oldDate,
+  });
+  git(repo, ["switch", "--quiet", "main"]);
+  git(repo, ["worktree", "add", "--quiet", uniqueWorktree, "feature/unique"]);
 
-  git(repo, ["branch", "feature/missing"])
-  git(repo, ["push", "--quiet", "--set-upstream", "origin", "feature/missing"])
-  git(repo, ["worktree", "add", "--quiet", missingWorktree, "feature/missing"])
-  rmSync(missingWorktree, { recursive: true, force: true })
+  git(repo, ["branch", "feature/missing"]);
+  git(repo, ["push", "--quiet", "--set-upstream", "origin", "feature/missing"]);
+  git(repo, ["worktree", "add", "--quiet", missingWorktree, "feature/missing"]);
+  rmSync(missingWorktree, { recursive: true, force: true });
 
   return {
     dirtyWorktree,
     root,
     oldWorktree,
-    uniqueWorktree
-  }
-}
+    uniqueWorktree,
+  };
+};
 
 test("candidates command prints safe and safety-blocked worktrees older than the minimum age", (t) => {
-  const { dirtyWorktree, oldWorktree, root, uniqueWorktree } = seedCandidateFixture(t)
+  const { dirtyWorktree, oldWorktree, root, uniqueWorktree } =
+    seedCandidateFixture(t);
 
   const output = execFileSync(
     process.execPath,
     ["--import", "tsx", "src/main.ts", "candidates", root, "--min-age", "30d"],
     {
       cwd: process.cwd(),
-      encoding: "utf8"
-    }
-  )
-  const parsed = JSON.parse(output)
+      encoding: "utf8",
+    },
+  );
+  const parsed = JSON.parse(output);
 
-  assert.equal(parsed.root, root)
-  assert.equal(parsed.minimumAgeDays, 30)
+  assert.equal(parsed.root, root);
+  assert.equal(parsed.minimumAgeDays, 30);
   assert.deepEqual(
     parsed.candidates.map((candidate: { path: string }) => candidate.path),
-    [oldWorktree]
-  )
-  assert.equal(parsed.candidates[0].decision.deletable, true)
+    [oldWorktree],
+  );
+  assert.equal(parsed.candidates[0].decision.deletable, true);
   assert.deepEqual(
-    parsed.blockedCandidates.map((candidate: { path: string }) => candidate.path).sort(),
-    [dirtyWorktree, uniqueWorktree].sort()
-  )
+    parsed.blockedCandidates
+      .map((candidate: { path: string }) => candidate.path)
+      .sort(),
+    [dirtyWorktree, uniqueWorktree].sort(),
+  );
   const dirtyCandidate = parsed.blockedCandidates.find(
-    (candidate: { path: string }) => candidate.path === dirtyWorktree
-  )
+    (candidate: { path: string }) => candidate.path === dirtyWorktree,
+  );
   const uniqueCandidate = parsed.blockedCandidates.find(
-    (candidate: { path: string }) => candidate.path === uniqueWorktree
-  )
+    (candidate: { path: string }) => candidate.path === uniqueWorktree,
+  );
   assert.deepEqual(dirtyCandidate.decision, {
     deletable: false,
-    reasons: ["dirty"]
-  })
-  assert.equal(dirtyCandidate.status.dirty, true)
+    reasons: ["dirty"],
+  });
+  assert.equal(dirtyCandidate.status.dirty, true);
   assert.deepEqual(uniqueCandidate.decision, {
     deletable: false,
-    reasons: ["unique_patches"]
-  })
-  assert.equal(uniqueCandidate.status.committedWork.uniquePatchCount, 1)
-})
+    reasons: ["unique_patches"],
+  });
+  assert.equal(uniqueCandidate.status.committedWork.uniquePatchCount, 1);
+});
 
 test("candidates command can print only the count summary", (t) => {
-  const { root } = seedCandidateFixture(t)
+  const { root } = seedCandidateFixture(t);
 
   const output = execFileSync(
     process.execPath,
-    ["--import", "tsx", "src/main.ts", "candidates", root, "--min-age", "30d", "--count"],
+    [
+      "--import",
+      "tsx",
+      "src/main.ts",
+      "candidates",
+      root,
+      "--min-age",
+      "30d",
+      "--count",
+    ],
     {
       cwd: process.cwd(),
-      encoding: "utf8"
-    }
-  )
+      encoding: "utf8",
+    },
+  );
 
   assert.equal(
     output,
@@ -147,30 +167,39 @@ test("candidates command can print only the count summary", (t) => {
       "blocked_untracked: 0",
       "blocked_missing_default_branch: 0",
       "blocked_unique_patches: 1",
-      ""
-    ].join("\n")
-  )
-})
+      "",
+    ].join("\n"),
+  );
+});
 
 test("candidates command prints repo and worktree progress to stderr", (t) => {
-  const { root } = seedCandidateFixture(t)
+  const { root } = seedCandidateFixture(t);
 
   const result = spawnSync(
     process.execPath,
-    ["--import", "tsx", "src/main.ts", "candidates", root, "--min-age", "30d", "--count"],
+    [
+      "--import",
+      "tsx",
+      "src/main.ts",
+      "candidates",
+      root,
+      "--min-age",
+      "30d",
+      "--count",
+    ],
     {
       cwd: process.cwd(),
       env: {
         ...process.env,
-        TREEZAP_PROGRESS: "1"
+        TREEZAP_PROGRESS: "1",
       },
-      encoding: "utf8"
-    }
-  )
+      encoding: "utf8",
+    },
+  );
 
-  assert.equal(result.status, 0)
-  assert.match(result.stdout, /deletable: 1/)
-  assert.match(result.stderr, /treezap: checking repos \[/)
-  assert.match(result.stderr, /treezap: inspecting worktrees \[/)
-  assert.match(result.stderr, /3\/3 worktrees/)
-})
+  assert.equal(result.status, 0);
+  assert.match(result.stdout, /deletable: 1/);
+  assert.match(result.stderr, /treezap: checking repos \[/);
+  assert.match(result.stderr, /treezap: inspecting worktrees \[/);
+  assert.match(result.stderr, /3\/3 worktrees/);
+});

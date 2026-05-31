@@ -1,94 +1,99 @@
-import { Effect, Either } from "effect"
+import { Effect, Either } from "effect";
 
 import {
   calculateAgeDays,
+  type DeletionDecision,
   evaluateDeletion,
-  type DeletionDecision
-} from "./deletable"
-import { removeWorktree, type GitRemoveWorktreeError } from "./git"
-import { inspectPath, type StatusError, type WorktreeStatus } from "./status"
+} from "./deletable";
+import { type GitRemoveWorktreeError, removeWorktree } from "./git";
+import { inspectPath, type StatusError, type WorktreeStatus } from "./status";
 
 export interface RemoveEvaluationOptions {
-  readonly now?: Date
-  readonly minimumAgeDays?: number
+  readonly now?: Date;
+  readonly minimumAgeDays?: number;
 }
 
 export interface RemoveEvaluationResult {
-  readonly path: string
-  readonly minimumAgeDays: number
-  readonly deleted: boolean
-  readonly eligible: boolean
-  readonly ageDays: number
-  readonly status: WorktreeStatus
-  readonly decision: DeletionDecision
+  readonly path: string;
+  readonly minimumAgeDays: number;
+  readonly deleted: boolean;
+  readonly eligible: boolean;
+  readonly ageDays: number;
+  readonly status: WorktreeStatus;
+  readonly decision: DeletionDecision;
 }
 
-const defaultMinimumAgeDays = 30
+const defaultMinimumAgeDays = 30;
 
-type RemovePathError = StatusError | GitRemoveWorktreeError
+type RemovePathError = StatusError | GitRemoveWorktreeError;
 
 const isSubmoduleWorktreeRemoveError = (error: RemovePathError): boolean =>
-  error._tag === "GitRemoveWorktreeError" && error.reason === "contains_submodules"
+  error._tag === "GitRemoveWorktreeError" &&
+  error.reason === "contains_submodules";
 
 export const removePath = (
   path: string,
-  options: RemoveEvaluationOptions = {}
+  options: RemoveEvaluationOptions = {},
 ): Effect.Effect<RemoveEvaluationResult, RemovePathError> => {
-  const now = options.now ?? new Date()
-  const minimumAgeDays = options.minimumAgeDays ?? defaultMinimumAgeDays
+  const now = options.now ?? new Date();
+  const minimumAgeDays = options.minimumAgeDays ?? defaultMinimumAgeDays;
 
   return Effect.gen(function* () {
-    const initial = yield* inspectPath(path)
-    const initialEvaluation = evaluateStatus(initial, now, minimumAgeDays)
+    const initial = yield* inspectPath(path);
+    const initialEvaluation = evaluateStatus(initial, now, minimumAgeDays);
 
     if (!initialEvaluation.eligible) {
-      return initialEvaluation
+      return initialEvaluation;
     }
 
-    const revalidated = yield* inspectPath(path)
-    const revalidatedEvaluation = evaluateStatus(revalidated, now, minimumAgeDays)
+    const revalidated = yield* inspectPath(path);
+    const revalidatedEvaluation = evaluateStatus(
+      revalidated,
+      now,
+      minimumAgeDays,
+    );
 
     if (!revalidatedEvaluation.eligible) {
-      return revalidatedEvaluation
+      return revalidatedEvaluation;
     }
 
-    let deletionEvaluation = revalidatedEvaluation
-    const removeResult = yield* removeWorktree(path).pipe(Effect.either)
+    let deletionEvaluation = revalidatedEvaluation;
+    const removeResult = yield* removeWorktree(path).pipe(Effect.either);
 
     if (Either.isLeft(removeResult)) {
       if (!isSubmoduleWorktreeRemoveError(removeResult.left)) {
-        return yield* Effect.fail(removeResult.left)
+        return yield* Effect.fail(removeResult.left);
       }
 
-      const submoduleRevalidated = yield* inspectPath(path)
+      const submoduleRevalidated = yield* inspectPath(path);
       const submoduleRevalidatedEvaluation = evaluateStatus(
         submoduleRevalidated,
         now,
-        minimumAgeDays
-      )
+        minimumAgeDays,
+      );
 
       if (!submoduleRevalidatedEvaluation.eligible) {
-        return submoduleRevalidatedEvaluation
+        return submoduleRevalidatedEvaluation;
       }
 
-      deletionEvaluation = submoduleRevalidatedEvaluation
-      yield* removeWorktree(path, { force: true })
+      deletionEvaluation = submoduleRevalidatedEvaluation;
+      yield* removeWorktree(path, { force: true });
     }
 
     return {
       ...deletionEvaluation,
-      deleted: true
-    }
-  })
-}
+      deleted: true,
+    };
+  });
+};
 
 const evaluateStatus = (
   status: WorktreeStatus,
   now: Date,
-  minimumAgeDays: number
+  minimumAgeDays: number,
 ): RemoveEvaluationResult => {
-  const decision = evaluateDeletion(status)
-  const ageDays = calculateAgeDays(status.lastCommitAt, now)
+  const decision = evaluateDeletion(status);
+  const ageDays = calculateAgeDays(status.lastCommitAt, now);
 
   return {
     path: status.path,
@@ -97,6 +102,6 @@ const evaluateStatus = (
     eligible: decision.deletable && ageDays > minimumAgeDays,
     ageDays,
     status,
-    decision
-  }
-}
+    decision,
+  };
+};

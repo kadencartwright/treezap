@@ -1,27 +1,43 @@
-import { Effect } from "effect"
+import { Effect } from "effect";
 
 import {
-  getDefaultRemoteBranch,
-  inspectPatchEquivalence,
-  parseGitCherryOutput,
   type CherryCommit,
   type GitCommandError,
-  type PatchEquivalence
-} from "./git"
+  getDefaultRemoteBranch,
+  inspectPatchEquivalence,
+  type PatchEquivalence,
+  parseGitCherryOutput,
+} from "./git";
 
-export type { CherryCommit }
-export type CommittedWorkStatus = PatchEquivalence
-export { parseGitCherryOutput }
+export type { CherryCommit };
+export type CommittedWorkStatus = PatchEquivalence;
+export { parseGitCherryOutput };
+
+export interface InspectCommittedWorkOptions {
+  readonly defaultBranch?: string | null;
+}
 
 export const inspectCommittedWork = (
-  path: string
+  path: string,
+  options: InspectCommittedWorkOptions = {},
 ): Effect.Effect<CommittedWorkStatus | undefined, GitCommandError> =>
-  getDefaultRemoteBranch(path).pipe(
+  getKnownDefaultBranch(path, options).pipe(
     Effect.flatMap((defaultBranch) => {
       if (defaultBranch === undefined) {
-        return Effect.succeed(undefined)
+        return Effect.succeed(undefined);
       }
 
-      return inspectPatchEquivalence(path, defaultBranch)
-    })
-  )
+      return inspectPatchEquivalence(path, defaultBranch);
+    }),
+  );
+
+const getKnownDefaultBranch = (
+  path: string,
+  options: InspectCommittedWorkOptions,
+): Effect.Effect<string | undefined, never> => {
+  if (options.defaultBranch !== undefined) {
+    return Effect.succeed(options.defaultBranch ?? undefined);
+  }
+
+  return getDefaultRemoteBranch(path);
+};

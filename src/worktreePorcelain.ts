@@ -1,140 +1,156 @@
 export type WorktreePorcelainStatus =
   | {
-      readonly kind: "branch"
-      readonly branch: string
+      readonly kind: "branch";
+      readonly branch: string;
     }
   | {
-      readonly kind: "detached"
+      readonly kind: "detached";
     }
   | {
-      readonly kind: "bare"
-    }
+      readonly kind: "bare";
+    };
 
 export interface WorktreePorcelainAnnotation {
-  readonly kind: "locked" | "prunable"
-  readonly reason?: string
+  readonly kind: "locked" | "prunable";
+  readonly reason?: string;
 }
 
 export interface WorktreePorcelainEntry {
-  readonly path: string
-  readonly head?: string
-  readonly status: WorktreePorcelainStatus
-  readonly annotations: ReadonlyArray<WorktreePorcelainAnnotation>
+  readonly path: string;
+  readonly head?: string;
+  readonly status: WorktreePorcelainStatus;
+  readonly annotations: ReadonlyArray<WorktreePorcelainAnnotation>;
 }
 
 export const isInspectableLinkedWorktree = (
   repositoryPath: string,
-  worktree: WorktreePorcelainEntry
+  worktree: WorktreePorcelainEntry,
 ): boolean =>
   worktree.path !== repositoryPath &&
-  !worktree.annotations.some((annotation) => annotation.kind === "prunable")
+  !worktree.annotations.some((annotation) => annotation.kind === "prunable");
 
 type Mutable<T> = {
-  -readonly [Key in keyof T]: T[Key]
-}
+  -readonly [Key in keyof T]: T[Key];
+};
 
 type WorktreePorcelainEntryDraft = Partial<Mutable<WorktreePorcelainEntry>> & {
-  status: WorktreePorcelainStatus
-  annotations: Array<WorktreePorcelainAnnotation>
-}
+  status: WorktreePorcelainStatus;
+  annotations: Array<WorktreePorcelainAnnotation>;
+};
 
 const branchNameFromRef = (ref: string): string =>
-  ref.startsWith("refs/heads/") ? ref.slice("refs/heads/".length) : ref
+  ref.startsWith("refs/heads/") ? ref.slice("refs/heads/".length) : ref;
 
 const applyRecordLine = (draft: WorktreePorcelainEntryDraft, line: string) => {
   if (line.startsWith("HEAD ")) {
-    draft.head = line.slice("HEAD ".length)
-    return
+    draft.head = line.slice("HEAD ".length);
+    return;
   }
 
   if (line.startsWith("branch ")) {
     draft.status = {
       kind: "branch",
-      branch: branchNameFromRef(line.slice("branch ".length))
-    }
-    return
+      branch: branchNameFromRef(line.slice("branch ".length)),
+    };
+    return;
   }
 
   if (line === "detached") {
     draft.status = {
-      kind: "detached"
-    }
-    return
+      kind: "detached",
+    };
+    return;
   }
 
   if (line === "bare") {
     draft.status = {
-      kind: "bare"
-    }
-    return
+      kind: "bare",
+    };
+    return;
   }
 
   if (line === "locked") {
     draft.annotations.push({
-      kind: "locked"
-    })
-    return
+      kind: "locked",
+    });
+    return;
   }
 
   if (line.startsWith("locked ")) {
     draft.annotations.push({
       kind: "locked",
-      reason: line.slice("locked ".length)
-    })
-    return
+      reason: line.slice("locked ".length),
+    });
+    return;
   }
 
   if (line === "prunable") {
     draft.annotations.push({
-      kind: "prunable"
-    })
-    return
+      kind: "prunable",
+    });
+    return;
   }
 
   if (line.startsWith("prunable ")) {
     draft.annotations.push({
       kind: "prunable",
-      reason: line.slice("prunable ".length)
-    })
+      reason: line.slice("prunable ".length),
+    });
   }
-}
+};
 
-const parseRecord = (record: string): WorktreePorcelainEntry | undefined => {
-  const lines = record.split(/\r?\n/).filter((line) => line !== "")
-  const [firstLine, ...remainingLines] = lines
+const parseRecordLines = (
+  lines: ReadonlyArray<string>,
+): WorktreePorcelainEntry | undefined => {
+  const [firstLine, ...remainingLines] = lines;
 
   if (firstLine === undefined || !firstLine.startsWith("worktree ")) {
-    return undefined
+    return undefined;
   }
 
   const draft: WorktreePorcelainEntryDraft = {
     path: firstLine.slice("worktree ".length),
     status: {
-      kind: "detached"
+      kind: "detached",
     },
-    annotations: []
-  }
+    annotations: [],
+  };
 
   for (const line of remainingLines) {
-    applyRecordLine(draft, line)
+    applyRecordLine(draft, line);
   }
 
   if (draft.path === undefined) {
-    return undefined
+    return undefined;
   }
 
   return {
     path: draft.path,
     head: draft.head,
     status: draft.status,
-    annotations: draft.annotations
-  }
-}
+    annotations: draft.annotations,
+  };
+};
 
-export const parseWorktreePorcelain = (input: string): ReadonlyArray<WorktreePorcelainEntry> =>
-  input
-    .split(/\r?\n\r?\n/)
-    .flatMap((record) => {
-      const entry = parseRecord(record)
-      return entry === undefined ? [] : [entry]
-    })
+const parseRecord = (record: string): WorktreePorcelainEntry | undefined =>
+  parseRecordLines(record.split(/\r?\n/).filter((line) => line !== ""));
+
+const parseWorktreePorcelainZ = (
+  input: string,
+): ReadonlyArray<WorktreePorcelainEntry> =>
+  input.split("\0\0").flatMap((record) => {
+    const entry = parseRecordLines(
+      record.split("\0").filter((line) => line !== ""),
+    );
+    return entry === undefined ? [] : [entry];
+  });
+
+export const parseWorktreePorcelain = (
+  input: string,
+): ReadonlyArray<WorktreePorcelainEntry> =>
+  input.includes("\0")
+    ? parseWorktreePorcelainZ(input)
+    : input.split(/\r?\n\r?\n/).flatMap((record) => {
+        const entry = parseRecord(record);
+        return entry === undefined ? [] : [entry];
+      });

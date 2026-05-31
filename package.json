@@ -1,45 +1,52 @@
 {
-	"name": "treezap",
-	"version": "0.1.4",
-	"description": "CLI primitives for discovering and deleting stale Git worktrees.",
-	"type": "module",
-	"homepage": "https://github.com/kadencartwright/treezap#readme",
-	"repository": {
-		"type": "git",
-		"url": "git+https://github.com/kadencartwright/treezap.git"
-	},
-	"bugs": {
-		"url": "https://github.com/kadencartwright/treezap/issues"
-	},
-	"bin": {
-		"treezap": "dist/main.cjs"
-	},
-	"scripts": {
-		"build": "node scripts/build.mjs",
-		"dev": "tsx src/main.ts",
-		"check": "tsc -p tsconfig.json --noEmit",
-		"test": "node --import tsx --test test/**/*.test.ts",
-		"fixture:build": "docker build -f Dockerfile.fixture -t treezap-fixture .",
-		"fixture:check": "docker run --rm treezap-fixture check-git-worktree-fixture",
-		"fixture:shell": "docker run --rm -it treezap-fixture",
-		"prepack": "npm run build"
-	},
-	"files": [
-		"dist"
-	],
-	"dependencies": {
-		"@effect/cli": "^0.75.1",
-		"@effect/platform": "^0.96.1",
-		"@effect/platform-node": "^0.106.0",
-		"effect": "^3.21.2"
-	},
-	"devDependencies": {
-		"@types/node": "^24.0.0",
-		"esbuild": "^0.28.0",
-		"tsx": "^4.20.0",
-		"typescript": "^5.9.0"
-	},
-	"engines": {
-		"node": ">=22"
-	}
+  "name": "treezap",
+  "version": "0.1.4",
+  "description": "CLI primitives for discovering and deleting stale Git worktrees.",
+  "type": "module",
+  "homepage": "https://github.com/kadencartwright/treezap#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kadencartwright/treezap.git"
+  },
+  "bugs": {
+    "url": "https://github.com/kadencartwright/treezap/issues"
+  },
+  "bin": {
+    "treezap": "dist/main.cjs"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "dev": "tsx src/main.ts",
+    "format": "biome format --write .",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "test": "node --import tsx --test test/**/*.test.ts",
+    "fixture:build": "docker build -f Dockerfile.fixture -t treezap-fixture .",
+    "fixture:check": "docker run --rm treezap-fixture check-git-worktree-fixture",
+    "fixture:shell": "docker run --rm -it treezap-fixture",
+    "prepare": "lefthook install",
+    "prepack": "npm run build"
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@effect/cli": "^0.75.1",
+    "@effect/platform": "^0.96.1",
+    "@effect/platform-node": "^0.106.0",
+    "effect": "^3.21.2"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.16",
+    "@types/node": "^24.0.0",
+    "esbuild": "^0.28.0",
+    "lefthook": "^2.1.9",
+    "lint-staged": "^16.4.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
 }

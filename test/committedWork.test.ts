@@ -1,7 +1,7 @@
-import assert from "node:assert/strict"
-import test from "node:test"
+import assert from "node:assert/strict";
+import test from "node:test";
 
-import { parseGitCherryOutput } from "../src/committedWork"
+import { parseGitCherryOutput } from "../src/committedWork";
 
 test("parses git cherry output into equivalent and unique patch counts", () => {
   assert.deepEqual(
@@ -10,8 +10,8 @@ test("parses git cherry output into equivalent and unique patch counts", () => {
       [
         "- aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "+ bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-        "+ cccccccccccccccccccccccccccccccccccccccc"
-      ].join("\n")
+        "+ cccccccccccccccccccccccccccccccccccccccc",
+      ].join("\n"),
     ),
     {
       base: "origin/main",
@@ -19,9 +19,9 @@ test("parses git cherry output into equivalent and unique patch counts", () => {
       equivalentPatchCount: 1,
       uniqueCommits: [
         { hash: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" },
-        { hash: "cccccccccccccccccccccccccccccccccccccccc" }
+        { hash: "cccccccccccccccccccccccccccccccccccccccc" },
       ],
-      equivalentCommits: [{ hash: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }]
-    }
-  )
-})
+      equivalentCommits: [{ hash: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }],
+    },
+  );
+});

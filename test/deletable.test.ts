@@ -1,10 +1,12 @@
-import assert from "node:assert/strict"
-import test from "node:test"
+import assert from "node:assert/strict";
+import test from "node:test";
 
-import { evaluateDeletion, selectDeletionCandidates } from "../src/deletable"
-import type { WorktreeStatus } from "../src/status"
+import { evaluateDeletion, selectDeletionCandidates } from "../src/deletable";
+import type { WorktreeStatus } from "../src/status";
 
-const cleanStatus = (overrides: Partial<WorktreeStatus> = {}): WorktreeStatus => ({
+const cleanStatus = (
+  overrides: Partial<WorktreeStatus> = {},
+): WorktreeStatus => ({
   path: "/repo",
   exists: true,
   isGitWorktree: true,
@@ -19,18 +21,21 @@ const cleanStatus = (overrides: Partial<WorktreeStatus> = {}): WorktreeStatus =>
     uniquePatchCount: 0,
     equivalentPatchCount: 0,
     uniqueCommits: [],
-    equivalentCommits: []
+    equivalentCommits: [],
   },
   lastCommitAt: "2026-01-01T12:00:00Z",
-  ...overrides
-})
+  ...overrides,
+});
 
 test("marks a clean worktree with no default branch as not deletable", () => {
-  assert.deepEqual(evaluateDeletion(cleanStatus({ committedWork: undefined })), {
-    deletable: false,
-    reasons: ["missing_default_branch"]
-  })
-})
+  assert.deepEqual(
+    evaluateDeletion(cleanStatus({ committedWork: undefined })),
+    {
+      deletable: false,
+      reasons: ["missing_default_branch"],
+    },
+  );
+});
 
 test("marks dirty, untracked, and unique-patch worktrees as not deletable", () => {
   assert.deepEqual(
@@ -45,26 +50,29 @@ test("marks dirty, untracked, and unique-patch worktrees as not deletable", () =
           uniquePatchCount: 1,
           equivalentPatchCount: 0,
           uniqueCommits: [{ hash: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" }],
-          equivalentCommits: []
-        }
-      })
+          equivalentCommits: [],
+        },
+      }),
     ),
     {
       deletable: false,
-      reasons: ["dirty", "untracked", "unique_patches"]
-    }
-  )
-})
+      reasons: ["dirty", "untracked", "unique_patches"],
+    },
+  );
+});
 
 test("does not use missing upstream as a hard blocker when default-branch patches are equivalent", () => {
-  assert.deepEqual(evaluateDeletion(cleanStatus({ upstream: undefined, ahead: 1 })), {
-    deletable: true,
-    reasons: []
-  })
-})
+  assert.deepEqual(
+    evaluateDeletion(cleanStatus({ upstream: undefined, ahead: 1 })),
+    {
+      deletable: true,
+      reasons: [],
+    },
+  );
+});
 
 test("selects only safe worktrees older than the minimum age", () => {
-  const now = new Date("2026-05-29T12:00:00Z")
+  const now = new Date("2026-05-29T12:00:00Z");
 
   assert.deepEqual(
     selectDeletionCandidates(
@@ -72,20 +80,20 @@ test("selects only safe worktrees older than the minimum age", () => {
         cleanStatus({
           path: "/old-safe",
           upstream: "origin/main",
-          lastCommitAt: "2026-04-28T12:00:00Z"
+          lastCommitAt: "2026-04-28T12:00:00Z",
         }),
         cleanStatus({
           path: "/young-safe",
           upstream: "origin/main",
-          lastCommitAt: "2026-04-29T12:00:01Z"
+          lastCommitAt: "2026-04-29T12:00:01Z",
         }),
         cleanStatus({
           path: "/old-unsafe",
           committedWork: undefined,
-          lastCommitAt: "2026-04-01T12:00:00Z"
-        })
+          lastCommitAt: "2026-04-01T12:00:00Z",
+        }),
       ],
-      { now }
+      { now },
     ),
     [
       {
@@ -94,19 +102,19 @@ test("selects only safe worktrees older than the minimum age", () => {
         status: cleanStatus({
           path: "/old-safe",
           upstream: "origin/main",
-          lastCommitAt: "2026-04-28T12:00:00Z"
+          lastCommitAt: "2026-04-28T12:00:00Z",
         }),
         decision: {
           deletable: true,
-          reasons: []
-        }
-      }
-    ]
-  )
-})
+          reasons: [],
+        },
+      },
+    ],
+  );
+});
 
 test("selects candidates using a custom minimum age", () => {
-  const now = new Date("2026-05-29T12:00:00Z")
+  const now = new Date("2026-05-29T12:00:00Z");
 
   assert.deepEqual(
     selectDeletionCandidates(
@@ -114,14 +122,14 @@ test("selects candidates using a custom minimum age", () => {
         cleanStatus({
           path: "/ten-days-old",
           upstream: "origin/main",
-          lastCommitAt: "2026-05-19T12:00:00Z"
-        })
+          lastCommitAt: "2026-05-19T12:00:00Z",
+        }),
       ],
       {
         now,
-        minimumAgeDays: 7
-      }
+        minimumAgeDays: 7,
+      },
     ).map((candidate) => candidate.path),
-    ["/ten-days-old"]
-  )
-})
+    ["/ten-days-old"],
+  );
+});

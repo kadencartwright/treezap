@@ -1,30 +1,45 @@
-import { Effect } from "effect"
+import { Effect } from "effect";
 
-import { inspectCommittedWork, type CommittedWorkStatus } from "./committedWork"
-import { inspectWorktree, type GitCommandError, type GitHead } from "./git"
-import type { WorktreePorcelainStatus } from "./worktreePorcelain"
+import {
+  type CommittedWorkStatus,
+  inspectCommittedWork,
+} from "./committedWork";
+import { type GitCommandError, type GitHead, inspectWorktree } from "./git";
+import type { WorktreePorcelainStatus } from "./worktreePorcelain";
 
 export interface WorktreeStatus {
-  readonly path: string
-  readonly exists: boolean
-  readonly isGitWorktree: boolean
-  readonly status: WorktreePorcelainStatus
-  readonly head: string
-  readonly upstream?: string
-  readonly dirty: boolean
-  readonly untracked: boolean
-  readonly ahead: number
-  readonly behind: number
-  readonly committedWork?: CommittedWorkStatus
-  readonly lastCommitAt: string
+  readonly path: string;
+  readonly exists: boolean;
+  readonly isGitWorktree: boolean;
+  readonly status: WorktreePorcelainStatus;
+  readonly head: string;
+  readonly upstream?: string;
+  readonly dirty: boolean;
+  readonly untracked: boolean;
+  readonly ahead: number;
+  readonly behind: number;
+  readonly committedWork?: CommittedWorkStatus;
+  readonly lastCommitAt: string;
 }
 
-export type StatusError = GitCommandError
+export type StatusError = GitCommandError;
 
-export const inspectPath = (path: string): Effect.Effect<WorktreeStatus, StatusError> =>
+export interface InspectPathOptions {
+  readonly defaultBranch?: string | null;
+  readonly lastCommitAt?: string;
+}
+
+export const inspectPath = (
+  path: string,
+  options: InspectPathOptions = {},
+): Effect.Effect<WorktreeStatus, StatusError> =>
   Effect.gen(function* () {
-    const worktree = yield* inspectWorktree(path)
-    const committedWork = yield* inspectCommittedWork(path)
+    const worktree = yield* inspectWorktree(path, {
+      lastCommitAt: options.lastCommitAt,
+    });
+    const committedWork = yield* inspectCommittedWork(path, {
+      defaultBranch: options.defaultBranch,
+    });
 
     return {
       path,
@@ -38,16 +53,16 @@ export const inspectPath = (path: string): Effect.Effect<WorktreeStatus, StatusE
       untracked: worktree.changes.untracked,
       ahead: worktree.upstream.ahead,
       behind: worktree.upstream.behind,
-      committedWork
-    }
-  })
+      committedWork,
+    };
+  });
 
 const toWorktreePorcelainStatus = (head: GitHead): WorktreePorcelainStatus =>
   head.kind === "branch"
     ? {
         kind: "branch",
-        branch: head.branch
+        branch: head.branch,
       }
     : {
-        kind: "detached"
-      }
+        kind: "detached",
+      };

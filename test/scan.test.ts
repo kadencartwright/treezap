@@ -1,13 +1,13 @@
-import assert from "node:assert/strict"
-import { execFileSync } from "node:child_process"
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
-import { tmpdir } from "node:os"
-import { join } from "node:path"
-import test from "node:test"
+import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import test from "node:test";
 
-import { Effect, Stream } from "effect"
+import { Effect, Stream } from "effect";
 
-import { collectScanRoot, scanRoot } from "../src/scan"
+import { collectScanRoot, scanRoot } from "../src/scan";
 
 const git = (cwd: string, args: ReadonlyArray<string>): string =>
   execFileSync("git", args, {
@@ -16,75 +16,90 @@ const git = (cwd: string, args: ReadonlyArray<string>): string =>
     env: {
       ...process.env,
       GIT_AUTHOR_DATE: "2026-01-01T12:00:00Z",
-      GIT_COMMITTER_DATE: "2026-01-01T12:00:00Z"
-    }
-  })
+      GIT_COMMITTER_DATE: "2026-01-01T12:00:00Z",
+    },
+  });
 
 const createRepo = (path: string) => {
-  mkdirSync(path, { recursive: true })
-  git(path, ["init", "--quiet", "--initial-branch", "main"])
-  git(path, ["config", "user.email", "treezap-test@example.test"])
-  git(path, ["config", "user.name", "Sentinel Test"])
+  mkdirSync(path, { recursive: true });
+  git(path, ["init", "--quiet", "--initial-branch", "main"]);
+  git(path, ["config", "user.email", "treezap-test@example.test"]);
+  git(path, ["config", "user.name", "Sentinel Test"]);
 
-  writeFileSync(join(path, "README.md"), "# test repo\n")
-  git(path, ["add", "README.md"])
-  git(path, ["commit", "--quiet", "-m", "initial commit"])
-}
+  writeFileSync(join(path, "README.md"), "# test repo\n");
+  git(path, ["add", "README.md"]);
+  git(path, ["commit", "--quiet", "-m", "initial commit"]);
+};
 
 test("scans repositories under a root and includes their worktrees", async (t) => {
-  const root = mkdtempSync(join(tmpdir(), "treezap-scan-"))
-  t.after(() => rmSync(root, { recursive: true, force: true }))
+  const root = mkdtempSync(join(tmpdir(), "treezap-scan-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
 
-  const alpha = join(root, "alpha")
-  const beta = join(root, "nested", "beta")
-  const alphaLinkedWorktree = join(root, "alpha-linked")
+  const alpha = join(root, "alpha");
+  const beta = join(root, "nested", "beta");
+  const alphaLinkedWorktree = join(root, "alpha-linked");
 
-  createRepo(alpha)
-  createRepo(beta)
-  git(alpha, ["worktree", "add", "--quiet", "-b", "feature/linked", alphaLinkedWorktree, "HEAD"])
+  createRepo(alpha);
+  createRepo(beta);
+  git(alpha, [
+    "worktree",
+    "add",
+    "--quiet",
+    "-b",
+    "feature/linked",
+    alphaLinkedWorktree,
+    "HEAD",
+  ]);
 
-  const result = await Effect.runPromise(collectScanRoot(root))
+  const result = await Effect.runPromise(collectScanRoot(root));
 
-  assert.equal(result.root, root)
+  assert.equal(result.root, root);
   assert.deepEqual(
     result.repositories.map((repository) => repository.path),
-    [alpha, beta]
-  )
+    [alpha, beta],
+  );
 
-  const alphaResult = result.repositories.find((repository) => repository.path === alpha)
-  assert.ok(alphaResult)
+  const alphaResult = result.repositories.find(
+    (repository) => repository.path === alpha,
+  );
+  assert.ok(alphaResult);
   assert.deepEqual(
     alphaResult.worktrees.map((worktree) => [worktree.path, worktree.status]),
     [
       [alpha, { kind: "branch", branch: "main" }],
-      [alphaLinkedWorktree, { kind: "branch", branch: "feature/linked" }]
-    ]
-  )
+      [alphaLinkedWorktree, { kind: "branch", branch: "feature/linked" }],
+    ],
+  );
 
-  const betaResult = result.repositories.find((repository) => repository.path === beta)
-  assert.ok(betaResult)
-  assert.deepEqual(betaResult.worktrees.map((worktree) => worktree.path), [beta])
-})
+  const betaResult = result.repositories.find(
+    (repository) => repository.path === beta,
+  );
+  assert.ok(betaResult);
+  assert.deepEqual(
+    betaResult.worktrees.map((worktree) => worktree.path),
+    [beta],
+  );
+});
 
 test("streams scanned repositories under a root", async (t) => {
-  const root = mkdtempSync(join(tmpdir(), "treezap-scan-"))
-  t.after(() => rmSync(root, { recursive: true, force: true }))
+  const root = mkdtempSync(join(tmpdir(), "treezap-scan-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
 
-  const alpha = join(root, "alpha")
-  const beta = join(root, "beta")
+  const alpha = join(root, "alpha");
+  const beta = join(root, "beta");
 
-  createRepo(alpha)
-  createRepo(beta)
+  createRepo(alpha);
+  createRepo(beta);
 
   const repositories = await Effect.runPromise(
     scanRoot(root).pipe(
       Stream.runCollect,
-      Effect.map((items) => Array.from(items))
-    )
-  )
+      Effect.map((items) => Array.from(items)),
+    ),
+  );
 
   assert.deepEqual(
     repositories.map((repository) => repository.path),
-    [alpha, beta]
-  )
-})
+    [alpha, beta],
+  );
+});

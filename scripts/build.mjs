@@ -1,6 +1,6 @@
-import { chmod } from "node:fs/promises"
+import { chmod } from "node:fs/promises";
 
-import * as esbuild from "esbuild"
+import * as esbuild from "esbuild";
 
 await esbuild.build({
   bundle: true,
@@ -8,7 +8,7 @@ await esbuild.build({
   format: "cjs",
   outfile: "dist/main.cjs",
   platform: "node",
-  target: "node22"
-})
+  target: "node22",
+});
 
-await chmod("dist/main.cjs", 0o755)
+await chmod("dist/main.cjs", 0o755);
