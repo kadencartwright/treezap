@@ -276,7 +276,7 @@ const commandHelp = {
 } as const;
 
 const rootHelp = [
-  "treezap 0.1.4",
+  "treezap 0.1.5",
   "Git worktree cleanup primitives.",
   "",
   "Usage:",
@@ -321,7 +321,7 @@ const command = Command.make("treezap", {}, () => Console.log(rootHelp)).pipe(
 
 const cli = Command.run(command, {
   name: "treezap",
-  version: "0.1.4",
+  version: "0.1.5",
 });
 
 installInterruptHandler();

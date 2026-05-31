@@ -20,7 +20,7 @@ test("running without a subcommand shows help", () => {
   );
   const help = stripAnsi(output);
 
-  assert.match(help, /treezap 0\.1\.4/);
+  assert.match(help, /treezap 0\.1\.5/);
   assert.match(help, /Usage:\n {2}treezap <command> \[options\]/);
   assert.match(help, /candidates <root> \[--min-age duration\] \[--count\]/);
   assert.doesNotMatch(help, /Run `treezap --help`\./);
