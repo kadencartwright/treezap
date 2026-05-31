@@ -22,7 +22,7 @@ export interface ScanOptions {
 
 export type ScanRootError = DiscoverReposError | GitCommandError;
 
-const defaultConcurrency = 128;
+const defaultConcurrency = 16;
 
 const renderRepoProgress = (
   checkedRepos: number,

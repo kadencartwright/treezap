@@ -61,6 +61,29 @@ test("records git command timings", async (t) => {
   assert.equal(summary.totalDurationMs >= 0, true);
 });
 
+test("caps concurrent git subprocesses", async (t) => {
+  const cwd = mkdtempSync(join(tmpdir(), "treezap-git-"));
+  t.after(() => rmSync(cwd, { recursive: true, force: true }));
+
+  resetGitCommandTimings();
+  await Effect.runPromise(
+    Effect.forEach(
+      Array.from({ length: 24 }),
+      () => runGit(cwd, ["-c", "alias.pause=!sleep 0.05", "pause"]),
+      { concurrency: 24, discard: true },
+    ),
+  );
+  const summary = summarizeGitCommandTimings();
+
+  assert.equal(summary.totalCommands, 24);
+  assert.equal(summary.maxGitSubprocesses, 32);
+  assert.equal(summary.maxConcurrentCommands > 1, true);
+  assert.equal(
+    summary.maxConcurrentCommands <= summary.maxGitSubprocesses,
+    true,
+  );
+});
+
 test("parses working tree porcelain into dirty and untracked facts", () => {
   assert.deepEqual(parseWorkingTreeChanges(""), {
     dirty: false,

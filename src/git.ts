@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import { performance } from "node:perf_hooks";
 
 import { Data, Effect, Either } from "effect";
@@ -85,6 +85,8 @@ export interface GitCommandTiming {
 export interface GitTimingSummary {
   readonly totalCommands: number;
   readonly totalDurationMs: number;
+  readonly maxConcurrentCommands: number;
+  readonly maxGitSubprocesses: number;
   readonly byCommand: ReadonlyArray<{
     readonly command: string;
     readonly count: number;
@@ -116,9 +118,24 @@ export class GitRemoveWorktreeError extends Data.TaggedError(
 }> {}
 
 const gitCommandTimings: Array<GitCommandTiming> = [];
+const maxGitSubprocesses = Math.max(
+  1,
+  Number.parseInt(process.env.TREEZAP_MAX_GIT_PROCESSES ?? "32", 10) || 32,
+);
+const pendingGitSubprocesses: Array<(release: () => void) => void> = [];
+let activeGitSubprocesses = 0;
+let maxObservedGitSubprocesses = 0;
+
+interface GitProcessResult {
+  readonly stdout: string;
+  readonly stderr: string;
+  readonly exitCode: number | undefined;
+  readonly cause?: unknown;
+}
 
 export const resetGitCommandTimings = (): void => {
   gitCommandTimings.length = 0;
+  maxObservedGitSubprocesses = activeGitSubprocesses;
 };
 
 export const getGitCommandTimings = (): ReadonlyArray<GitCommandTiming> => [
@@ -150,6 +167,8 @@ export const summarizeGitCommandTimings = (): GitTimingSummary => {
   return {
     totalCommands: gitCommandTimings.length,
     totalDurationMs,
+    maxConcurrentCommands: maxObservedGitSubprocesses,
+    maxGitSubprocesses,
     byCommand: Array.from(byCommand, ([command, value]) => ({
       command,
       count: value.count,
@@ -159,25 +178,111 @@ export const summarizeGitCommandTimings = (): GitTimingSummary => {
   };
 };
 
+const releaseGitSubprocess = (): void => {
+  activeGitSubprocesses -= 1;
+  const next = pendingGitSubprocesses.shift();
+
+  if (next === undefined) {
+    return;
+  }
+
+  activeGitSubprocesses += 1;
+  maxObservedGitSubprocesses = Math.max(
+    maxObservedGitSubprocesses,
+    activeGitSubprocesses,
+  );
+  next(releaseGitSubprocess);
+};
+
+const acquireGitSubprocess = (): Promise<() => void> => {
+  if (activeGitSubprocesses < maxGitSubprocesses) {
+    activeGitSubprocesses += 1;
+    maxObservedGitSubprocesses = Math.max(
+      maxObservedGitSubprocesses,
+      activeGitSubprocesses,
+    );
+    return Promise.resolve(releaseGitSubprocess);
+  }
+
+  return new Promise((resolve) => {
+    pendingGitSubprocesses.push(resolve);
+  });
+};
+
+const runGitProcess = async (
+  cwd: string,
+  args: ReadonlyArray<string>,
+): Promise<GitProcessResult> => {
+  const release = await acquireGitSubprocess();
+  const startedAt = performance.now();
+
+  return new Promise((resolve) => {
+    let stdout = "";
+    let stderr = "";
+    let settled = false;
+
+    const finish = (result: GitProcessResult): void => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      gitCommandTimings.push({
+        cwd,
+        args,
+        exitCode: result.exitCode,
+        durationMs: performance.now() - startedAt,
+      });
+      release();
+      resolve(result);
+    };
+
+    try {
+      const child = spawn("git", [...args], {
+        cwd,
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+
+      child.stdout.setEncoding("utf8");
+      child.stderr.setEncoding("utf8");
+      child.stdout.on("data", (chunk: string) => {
+        stdout += chunk;
+      });
+      child.stderr.on("data", (chunk: string) => {
+        stderr += chunk;
+      });
+      child.once("error", (cause) => {
+        finish({
+          stdout,
+          stderr,
+          exitCode: undefined,
+          cause,
+        });
+      });
+      child.once("close", (exitCode) => {
+        finish({
+          stdout,
+          stderr,
+          exitCode: exitCode ?? undefined,
+        });
+      });
+    } catch (cause) {
+      finish({
+        stdout,
+        stderr,
+        exitCode: undefined,
+        cause,
+      });
+    }
+  });
+};
+
 export const runGit = (
   cwd: string,
   args: ReadonlyArray<string>,
 ): Effect.Effect<GitCommandResult, GitCommandError> => {
-  const spawn = Effect.try({
-    try: () => {
-      const startedAt = performance.now();
-      const result = spawnSync("git", args, {
-        cwd,
-        encoding: "utf8",
-      });
-      gitCommandTimings.push({
-        cwd,
-        args,
-        exitCode: result.status ?? undefined,
-        durationMs: performance.now() - startedAt,
-      });
-      return result;
-    },
+  const command = Effect.tryPromise({
+    try: () => runGitProcess(cwd, args),
     catch: (cause): GitCommandError =>
       new GitCommandError({
         cwd,
@@ -189,17 +294,17 @@ export const runGit = (
       }),
   });
 
-  return spawn.pipe(
+  return command.pipe(
     Effect.flatMap((result) => {
-      if (result.error !== undefined || result.status !== 0) {
+      if (result.cause !== undefined || result.exitCode !== 0) {
         return Effect.fail(
           new GitCommandError({
             cwd,
             args,
             stdout: result.stdout,
             stderr: result.stderr,
-            exitCode: result.status ?? undefined,
-            cause: result.error ?? result,
+            exitCode: result.exitCode,
+            cause: result.cause ?? result,
           }),
         );
       }
@@ -209,7 +314,7 @@ export const runGit = (
         args,
         stdout: result.stdout,
         stderr: result.stderr,
-        exitCode: result.status,
+        exitCode: result.exitCode,
       });
     }),
   );
