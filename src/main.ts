@@ -4,7 +4,7 @@ import { Args, CliConfig, Command, Options } from "@effect/cli";
 import { NodeContext, NodeRuntime } from "@effect/platform-node";
 import { Console, Effect } from "effect";
 
-import { removeOldWorktrees } from "./bulkRemove";
+import { type BulkRemoveResult, removeOldWorktrees } from "./bulkRemove";
 import { type CandidateCounts, collectCandidates } from "./candidates";
 import { evaluateDeletion } from "./deletable";
 import {
@@ -15,6 +15,13 @@ import {
 import { removePath } from "./remove";
 import { collectScanRoot } from "./scan";
 import { inspectPath } from "./status";
+
+const installInterruptHandler = (): void => {
+  process.once("SIGINT", () => {
+    process.stderr.write("\r\x1b[2Ktreezap: interrupted\n");
+    process.exit(130);
+  });
+};
 
 const minAge = Options.text("min-age").pipe(
   Options.withPseudoName("duration"),
@@ -55,6 +62,89 @@ const formatCandidateCounts = (counts: CandidateCounts): string =>
     `blocked_missing_default_branch: ${counts.oldEnoughBlocked.reasons.missing_default_branch}`,
     `blocked_unique_patches: ${counts.oldEnoughBlocked.reasons.unique_patches}`,
   ].join("\n");
+
+const formatSkipDetail = (
+  result: BulkRemoveResult["skipped"][number],
+): string => {
+  if (result.decision.reasons.length > 0) {
+    return result.decision.reasons.join(", ");
+  }
+
+  return `age ${result.ageDays}d <= minimum ${result.minimumAgeDays}d`;
+};
+
+const formatFailureDetail = (
+  failure: BulkRemoveResult["failed"][number],
+): string => {
+  if (
+    typeof failure.error === "object" &&
+    failure.error !== null &&
+    "_tag" in failure.error &&
+    typeof failure.error._tag === "string"
+  ) {
+    return failure.error._tag;
+  }
+
+  if (failure.error instanceof Error) {
+    return failure.error.message;
+  }
+
+  return String(failure.error);
+};
+
+const appendPathSection = (
+  lines: Array<string>,
+  title: string,
+  paths: ReadonlyArray<string>,
+): void => {
+  if (paths.length === 0) {
+    return;
+  }
+
+  lines.push("", `${title}:`);
+
+  for (const path of paths) {
+    lines.push(`  ${path}`);
+  }
+};
+
+const skippedPathDisplayLimit = 5;
+
+const formatBulkRemoveResult = (result: BulkRemoveResult): string => {
+  const lines = [
+    `deleted: ${result.deleted.length}`,
+    `skipped: ${result.skipped.length}`,
+    `failed: ${result.failed.length}`,
+  ];
+
+  appendPathSection(
+    lines,
+    "deleted paths",
+    result.deleted.map((item) => item.path),
+  );
+
+  if (result.skipped.length > 0) {
+    lines.push("", "skipped paths:");
+
+    for (const item of result.skipped.slice(0, skippedPathDisplayLimit)) {
+      lines.push(`  ${item.path} (${formatSkipDetail(item)})`);
+    }
+
+    if (result.skipped.length > skippedPathDisplayLimit) {
+      lines.push(`  ${result.skipped.length} total...`);
+    }
+  }
+
+  if (result.failed.length > 0) {
+    lines.push("", "failed paths:");
+
+    for (const item of result.failed) {
+      lines.push(`  ${item.path} (${formatFailureDetail(item)})`);
+    }
+  }
+
+  return lines.join("\n");
+};
 
 const scan = Command.make("scan", { root: rootArg }, ({ root }) =>
   Effect.gen(function* () {
@@ -124,7 +214,7 @@ const rmOld = Command.make(
         minimumAgeDays,
         progress: true,
       });
-      yield* Console.log(JSON.stringify(result, null, 2));
+      yield* Console.log(formatBulkRemoveResult(result));
     }),
 ).pipe(Command.withDescription("Delete eligible linked worktrees."));
 
@@ -233,6 +323,8 @@ const cli = Command.run(command, {
   name: "treezap",
   version: "0.1.4",
 });
+
+installInterruptHandler();
 
 if (!printHelpIfRequested(process.argv.slice(2))) {
   NodeRuntime.runMain(

@@ -1,5 +1,5 @@
-import { Effect, Either } from "effect";
-
+import { Effect, Either, Ref } from "effect";
+import { clearProgress, renderProgressBar, writeProgress } from "./progress";
 import { type RemoveEvaluationResult, removePath } from "./remove";
 import { collectScanRoot, type ScanOptions, type ScanRootError } from "./scan";
 import { isInspectableLinkedWorktree } from "./worktreePorcelain";
@@ -29,6 +29,18 @@ interface BulkRemoveBuckets {
 
 const defaultMinimumAgeDays = 30;
 
+const renderRemovalProgress = (
+  completed: number,
+  total: number,
+  buckets: BulkRemoveBuckets,
+): string =>
+  renderProgressBar(
+    "deleting worktrees",
+    completed,
+    total,
+    `${buckets.deleted.length} deleted, ${buckets.skipped.length} skipped, ${buckets.failed.length} failed`,
+  );
+
 export const removeOldWorktrees = (
   root: string,
   options: BulkRemoveOptions = {},
@@ -46,22 +58,39 @@ export const removeOldWorktrees = (
         )
         .map((worktree) => worktree.path),
     );
+    const progress = options.progress ?? false;
+    const buckets = {
+      deleted,
+      skipped,
+      failed,
+    };
+    const completed = yield* Ref.make(0);
 
+    yield* writeProgress(
+      progress,
+      renderRemovalProgress(0, linkedWorktrees.length, buckets),
+    );
     yield* Effect.forEach(
       linkedWorktrees,
       (path) =>
         removePath(path, { minimumAgeDays }).pipe(
           Effect.either,
-          Effect.map((result) =>
-            recordRemoveResult(path, result, {
-              deleted,
-              skipped,
-              failed,
-            }),
+          Effect.flatMap((result) =>
+            Effect.sync(() => recordRemoveResult(path, result, buckets)).pipe(
+              Effect.flatMap(() =>
+                Ref.updateAndGet(completed, (count) => count + 1),
+              ),
+              Effect.flatMap((count) =>
+                writeProgress(
+                  progress,
+                  renderRemovalProgress(count, linkedWorktrees.length, buckets),
+                ),
+              ),
+            ),
           ),
         ),
       { discard: true },
-    );
+    ).pipe(Effect.ensuring(clearProgress(progress)));
 
     return {
       root,
